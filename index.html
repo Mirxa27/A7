@@ -11,31 +11,68 @@
         background-color: #020617; /* slate-950 */
         color: #e2e8f0; /* slate-200 */
         font-family: 'Share Tech Mono', monospace; /* Tech look */
+        cursor: crosshair;
+        overflow: hidden;
       }
       /* Custom scrollbar for tactical feel */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 4px;
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
-        background: #0f172a; 
+        background: rgba(15, 23, 42, 0.5); 
       }
       ::-webkit-scrollbar-thumb {
-        background: #334155; 
-        border-radius: 4px;
+        background: #10b981; /* emerald-500 */
+        border-radius: 2px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #475569; 
+        background: #34d399; 
       }
       .animate-scanline {
-        background: linear-gradient(to bottom, transparent 50%, rgba(0, 255, 128, 0.02) 51%, transparent 51%);
+        background: linear-gradient(to bottom, transparent 50%, rgba(16, 185, 129, 0.03) 51%, transparent 51%);
         background-size: 100% 4px;
-        animation: scanline 10s linear infinite;
+        animation: scanline 8s linear infinite;
+        pointer-events: none;
+      }
+      .vignette {
+        background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.4) 100%);
+        pointer-events: none;
+      }
+      .noise {
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        opacity: 0.015;
         pointer-events: none;
       }
       @keyframes scanline {
         0% { background-position: 0 0; }
         100% { background-position: 0 100%; }
+      }
+      @keyframes flicker {
+        0% { opacity: 0.97; }
+        5% { opacity: 0.95; }
+        10% { opacity: 0.9; }
+        15% { opacity: 0.95; }
+        20% { opacity: 0.98; }
+        25% { opacity: 0.95; }
+        30% { opacity: 0.9; }
+        35% { opacity: 0.95; }
+        40% { opacity: 0.98; }
+        45% { opacity: 0.95; }
+        50% { opacity: 0.9; }
+        55% { opacity: 0.95; }
+        60% { opacity: 0.98; }
+        65% { opacity: 0.95; }
+        70% { opacity: 0.9; }
+        75% { opacity: 0.95; }
+        80% { opacity: 0.98; }
+        85% { opacity: 0.95; }
+        90% { opacity: 0.9; }
+        95% { opacity: 0.95; }
+        100% { opacity: 0.98; }
+      }
+      .flicker {
+        animation: flicker 0.15s infinite;
       }
     </style>
   <script type="importmap">
@@ -55,7 +92,9 @@
 </head>
   <body>
     <div id="root"></div>
-    <div class="fixed inset-0 pointer-events-none z-50 animate-scanline"></div>
+    <div class="fixed inset-0 pointer-events-none z-[60] animate-scanline"></div>
+    <div class="fixed inset-0 pointer-events-none z-[61] vignette"></div>
+    <div class="fixed inset-0 pointer-events-none z-[62] noise"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

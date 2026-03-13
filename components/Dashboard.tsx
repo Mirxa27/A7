@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Shield, Globe, Users, Wifi, LucideIcon, Activity, Zap, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getAssets, getIntelRecords, getSystemLogs, getSettings } from '../services/storageService';
 import { ChartDataPoint } from '../types';
 import { useOperations } from '../context/OperationsContext';
+
 const generateInitialData = (): ChartDataPoint[] => {
   return Array.from({ length: 20 }, (_, i) => ({
     name: `T-${i}`,
@@ -19,9 +21,10 @@ interface StatCardProps {
   sub: string;
   icon: LucideIcon;
   color: string;
+  index: number;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, color }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, color, index }) => {
   const [displayValue, setDisplayValue] = useState(value);
   
   useEffect(() => {
@@ -29,7 +32,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, colo
   }, [value]);
 
   return (
-    <div className="bg-slate-900/40 border border-slate-800 p-6 rounded-lg backdrop-blur-md relative overflow-hidden group hover:border-slate-700 transition-all duration-500 cursor-default">
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1, duration: 0.5 }}
+      className="bg-slate-900/40 border border-slate-800 p-6 rounded-lg backdrop-blur-md relative overflow-hidden group hover:border-slate-700 transition-all duration-500 cursor-default"
+    >
       <div className={`absolute top-0 left-0 w-1 h-full ${color.replace('text-', 'bg-')}`}></div>
       <div className="flex justify-between items-start mb-4">
         <div className="p-2 bg-slate-950 rounded border border-slate-800 group-hover:scale-110 transition-transform duration-500">
@@ -53,7 +61,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, colo
       <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
           <Icon size={120} />
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -151,8 +159,12 @@ export const Dashboard: React.FC = () => {
   }, [activeRegions]);
 
   return (
-    <div className="p-8 space-y-8 animate-in fade-in duration-700">
-      <header className="flex justify-between items-end border-b border-slate-800 pb-6">
+    <div className="p-8 space-y-8">
+      <motion.header 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-end border-b border-slate-800 pb-6"
+      >
         <div>
           <h2 className="text-4xl font-bold text-white tracking-tighter mb-1">MISSION CONTROL</h2>
           <div className="flex items-center gap-6">
@@ -182,17 +194,22 @@ export const Dashboard: React.FC = () => {
              <div className="text-[10px] text-slate-600 tracking-widest uppercase mb-1">SYSTEM_TIME_UTC</div>
              <div className="text-2xl font-bold text-emerald-500 tabular-nums tracking-tighter">{new Date().toLocaleTimeString()}</div>
         </div>
-      </header>
+      </motion.header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="DETECTED THREATS" value={stats.threats} sub="HIGH_PRIORITY_TARGETS" icon={Shield} color="text-red-500" />
-        <StatCard title="ACTIVE NODES" value={stats.nodes} sub="GLOBAL_ASSET_GRID" icon={Globe} color="text-blue-500" />
-        <StatCard title="INTEL RECORDS" value={stats.interceptions} sub="ENCRYPTED_ARCHIVES" icon={Wifi} color="text-amber-500" />
-        <StatCard title="SYSTEM EVENTS" value={stats.logs} sub="24H_LOG_ACTIVITY" icon={Users} color="text-emerald-500" />
+        <StatCard index={0} title="DETECTED THREATS" value={stats.threats} sub="HIGH_PRIORITY_TARGETS" icon={Shield} color="text-red-500" />
+        <StatCard index={1} title="ACTIVE NODES" value={stats.nodes} sub="GLOBAL_ASSET_GRID" icon={Globe} color="text-blue-500" />
+        <StatCard index={2} title="INTEL RECORDS" value={stats.interceptions} sub="ENCRYPTED_ARCHIVES" icon={Wifi} color="text-amber-500" />
+        <StatCard index={3} title="SYSTEM EVENTS" value={stats.logs} sub="24H_LOG_ACTIVITY" icon={Users} color="text-emerald-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-slate-900/40 border border-slate-800 rounded-lg p-6 flex flex-col min-h-[400px] relative overflow-hidden group">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          className="lg:col-span-2 bg-slate-900/40 border border-slate-800 rounded-lg p-6 flex flex-col min-h-[400px] relative overflow-hidden group"
+        >
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
           <div className="flex justify-between items-center mb-8">
               <h3 className="text-slate-500 text-xs font-bold tracking-widest flex items-center uppercase">
@@ -236,9 +253,14 @@ export const Dashboard: React.FC = () => {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-6 relative overflow-hidden flex flex-col min-h-[400px]">
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-slate-900/40 border border-slate-800 rounded-lg p-6 relative overflow-hidden flex flex-col min-h-[400px]"
+        >
              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(16,185,129,0.05),transparent_70%)] pointer-events-none"></div>
              <h3 className="text-slate-500 text-xs font-bold mb-8 tracking-widest uppercase flex items-center">
                 <Globe size={14} className="text-blue-500 mr-2" />
@@ -279,7 +301,7 @@ export const Dashboard: React.FC = () => {
                     <span className="text-[9px] font-mono text-slate-600 uppercase">V_2.4.0</span>
                 </div>
             </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

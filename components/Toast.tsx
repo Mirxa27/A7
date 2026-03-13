@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
 import { audio } from '../services/audioService';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastMessage {
   id: string;
@@ -41,12 +41,14 @@ const ToastItem: React.FC<{ toast: ToastMessage; onRemove: () => void }> = ({ to
     success: <CheckCircle className="text-emerald-500" size={18} />,
     error: <AlertCircle className="text-red-500" size={18} />,
     info: <Info className="text-blue-500" size={18} />,
+    warning: <AlertCircle className="text-amber-500" size={18} />,
   };
 
   const borders = {
     success: 'border-emerald-500/50 bg-emerald-950/90',
     error: 'border-red-500/50 bg-red-950/90',
     info: 'border-blue-500/50 bg-blue-950/90',
+    warning: 'border-amber-500/50 bg-amber-950/90',
   };
 
   return (

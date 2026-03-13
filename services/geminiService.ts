@@ -107,7 +107,14 @@ const callHuggingFace = async (prompt: string, systemInstruction: string, settin
                 }),
             });
 
-            const result = await response.json();
+            let result;
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                result = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`Hugging Face Proxy returned non-JSON response (${response.status}): ${text.substring(0, 100)}...`);
+            }
 
             if (response.ok) {
                 if (Array.isArray(result)) {
@@ -137,30 +144,41 @@ const callHuggingFace = async (prompt: string, systemInstruction: string, settin
     throw lastError || new Error("Hugging Face connection failed.");
 };
 
-const callOpenAI = async (prompt: string, systemInstruction: string, settings: AISettings): Promise<string> => {
+export const callOpenAI = async (prompt: string, systemInstruction: string, settings: AISettings): Promise<string> => {
     const model = settings.model || 'gpt-4o';
     const baseUrl = settings.baseUrl || 'https://api.openai.com/v1';
     
     try {
-        const response = await fetch(`${baseUrl}/chat/completions`, {
+        const response = await fetch('/api/ai/openai', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${settings.apiKey}`
             },
             body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.0
+                baseUrl,
+                apiKey: settings.apiKey,
+                payload: {
+                    model,
+                    messages: [
+                        { role: 'system', content: systemInstruction },
+                        { role: 'user', content: prompt }
+                    ],
+                    temperature: 0.0
+                }
             })
         });
 
-        const result = await response.json();
+        let result;
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            result = await response.json();
+        } else {
+            const text = await response.text();
+            throw new Error(`OpenAI Proxy returned non-JSON response (${response.status}): ${text.substring(0, 100)}...`);
+        }
+
         if (!response.ok) {
-            throw new Error(`OpenAI API Error (${response.status}): ${result.error?.message || JSON.stringify(result)}`);
+            throw new Error(`OpenAI Proxy Error (${response.status}): ${result.error?.message || result.error || JSON.stringify(result)}`);
         }
 
         return result.choices?.[0]?.message?.content || "";
@@ -276,11 +294,25 @@ export const executeIterativeResearch = async (goal: string, rounds = 3): Promis
             prompt: `Based on the research goal: "${goal}" and current facts: "${currentFactBase}", generate 3 specific, high-intent search queries to find missing or deeper information.`,
             systemInstruction: "Output ONLY a JSON array of 3 strings.",
             responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            },
             temperature: 0.1
         });
 
-        const queries: string[] = JSON.parse(cleanJson(planRes.text));
-        researchLog.push(`[ROUND ${i}] Queries: ${queries.join(' | ')}`);
+        let queries: string[] = [];
+        try {
+            const parsed = JSON.parse(cleanJson(planRes.text));
+            queries = Array.isArray(parsed) ? parsed : (parsed.queries || []);
+        } catch (e) {
+            console.error("Failed to parse research queries", e);
+            queries = [goal]; // Fallback to original goal
+        }
+
+        if (queries.length > 0) {
+            researchLog.push(`[ROUND ${i}] Queries: ${queries.join(' | ')}`);
+        }
 
         // 2. Execute grounded searches for each query
         for (const query of queries) {
@@ -681,7 +713,8 @@ Return JSON array: { "name": "string", "size": "string", "date": "string", "type
             systemInstruction: "You are a cyber intelligence analyst. Generate realistic exfiltration artifacts.",
             responseMimeType: "application/json"
         });
-        return JSON.parse(cleanJson(aiRes.text));
+        const result = JSON.parse(cleanJson(aiRes.text));
+        return Array.isArray(result) ? result : (result.files || result.artifacts || []);
     } catch (error) {
         addSystemLog('AI_CORE', 'Artifact generation failed.', 'ERROR');
         return [];

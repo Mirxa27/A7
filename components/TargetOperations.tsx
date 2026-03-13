@@ -323,7 +323,7 @@ export const TargetOperations: React.FC = () => {
     audio.playClick();
     try {
         const audioData = await synthesizeSpeech(dossier.report);
-        await audio.playAudioBuffer(audioData);
+        await audio.playAudio(audioData);
     } catch (e) {
         console.error("Audio failure", e);
     } finally {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { ViewState } from '../types';
 import { ShieldAlert, Activity, FileText, Network, Terminal, LogOut, Radio, UserCheck, TrendingUp, Database, Crosshair, Menu, X, Volume2, VolumeX, HardDrive, Settings as SettingsIcon } from 'lucide-react';
 import { useOperations } from '../context/OperationsContext';
@@ -56,11 +57,17 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
     >
       <Icon size={20} />
       <span className="font-bold tracking-wider">{label}</span>
+      {currentView === view && (
+        <motion.div 
+          layoutId="activeNav"
+          className="absolute right-0 w-1 h-8 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"
+        />
+      )}
     </button>
   );
 
   return (
-    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-200 font-mono">
+    <div className="flex h-screen bg-slate-950 overflow-hidden text-slate-200 font-mono selection:bg-emerald-500/30">
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-50">
           <div className="flex items-center space-x-2">
@@ -76,13 +83,17 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
       <aside className={`fixed inset-y-0 left-0 w-64 border-r border-slate-800 flex flex-col bg-slate-900/95 backdrop-blur-md z-40 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
-        <div className="p-6 border-b border-slate-800 flex items-center space-x-2 h-20 lg:h-auto">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="p-6 border-b border-slate-800 flex items-center space-x-2 h-20 lg:h-auto"
+        >
           <ShieldAlert className="text-emerald-500" size={32} />
           <div>
             <h1 className="text-xl font-bold text-white tracking-widest">AGENT7</h1>
             <p className="text-xs text-emerald-600 font-mono">INTEL_OPS_V.2.4</p>
           </div>
-        </div>
+        </motion.div>
 
         <nav className="flex-1 py-6 space-y-1 pr-4 overflow-y-auto custom-scrollbar">
           <div className="px-4 py-2 text-xs font-mono text-slate-600 font-bold">CORE SYSTEMS</div>
@@ -104,22 +115,35 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <div className="bg-slate-900 rounded p-3 text-xs font-mono text-slate-500 border border-slate-800 mb-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="bg-slate-900 rounded p-3 text-xs font-mono text-slate-500 border border-slate-800 mb-4"
+          >
              <div className="flex justify-between">
                 <span>CPU</span>
                 <span className="text-emerald-500">12%</span>
              </div>
              <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full w-[12%]"></div>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: '12%' }}
+                  className="bg-emerald-500 h-full"
+                ></motion.div>
              </div>
              <div className="flex justify-between mt-2">
                 <span>MEM</span>
                 <span className="text-emerald-500">43%</span>
              </div>
               <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
-                <div className="bg-emerald-500 h-full w-[43%]"></div>
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: '43%' }}
+                  className="bg-emerald-500 h-full"
+                ></motion.div>
              </div>
-          </div>
+          </motion.div>
           
           <div className="flex space-x-2">
               <button 
@@ -146,14 +170,18 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
         
         {/* Breadcrumb / Header */}
         <header className="hidden lg:flex h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm items-center justify-between px-8 z-30">
-            <div className="flex items-center space-x-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center space-x-4"
+            >
                 <div className="flex items-center space-x-2 text-xs font-mono text-slate-500">
                     <ShieldAlert size={14} className="text-emerald-500" />
                     <span className="tracking-widest">AGENT7</span>
                     <span className="text-slate-700">/</span>
                     <span className="text-emerald-400 font-bold tracking-widest">{currentView.replace('_', ' ')}</span>
                 </div>
-            </div>
+            </motion.div>
                 <div className="flex items-center space-x-6">
                     <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full ${aiStatus === 'READY' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'} `}></div>
@@ -169,7 +197,18 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
         </header>
 
         <div className="flex-1 relative overflow-auto custom-scrollbar">
-            {children}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentView}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="h-full"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
         </div>
       </main>
     </div>

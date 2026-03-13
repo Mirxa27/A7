@@ -13,6 +13,7 @@ import { DataIngestion } from './components/DataIngestion';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ThreatMonitor } from './components/ThreatMonitor';
 import { ViewState } from './types';
 import { OperationsProvider } from './context/OperationsContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -62,6 +63,7 @@ function App() {
           <Layout currentView={view} setView={setView}>
             {renderView()}
           </Layout>
+          <ThreatMonitor />
         </OperationsProvider>
       </NotificationProvider>
     </ErrorBoundary>

@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { PrismaClient } from "@prisma/client";
 import { withAccelerate } from "@prisma/extension-accelerate";
@@ -20,9 +21,22 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(cors());
   app.use(express.json());
 
+  // Request logging
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[API_REQUEST] ${req.method} ${req.path}`);
+    }
+    next();
+  });
+
   // API routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   app.get("/api/intel", async (req, res) => {
     try {
       const records = await prisma.intelRecord.findMany({
@@ -132,6 +146,7 @@ async function startServer() {
   });
 
   app.post("/api/ai/huggingface", async (req, res) => {
+    console.log(`[AI_PROXY] Hugging Face request received: ${req.body?.endpoint}`);
     try {
       const { endpoint, payload, apiKey } = req.body;
       if (!endpoint || !payload || !apiKey) {
@@ -147,7 +162,14 @@ async function startServer() {
         body: JSON.stringify(payload)
       });
       
-      const data = await response.json();
+      const contentType = response.headers.get("content-type");
+      let data;
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        data = { error: await response.text() };
+      }
+
       if (!response.ok) {
         return res.status(response.status).json(data);
       }
@@ -156,6 +178,47 @@ async function startServer() {
       console.error("Hugging Face Proxy Error:", error);
       res.status(500).json({ error: "Failed to connect to Hugging Face", details: error.message });
     }
+  });
+
+  app.post("/api/ai/openai", async (req, res) => {
+    console.log(`[AI_PROXY] OpenAI request received: ${req.body?.baseUrl}`);
+    try {
+      const { baseUrl, payload, apiKey } = req.body;
+      if (!payload || !apiKey) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const url = `${baseUrl || 'https://api.openai.com/v1'}/chat/completions`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const contentType = response.headers.get("content-type");
+      let data;
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        data = { error: await response.text() };
+      }
+
+      if (!response.ok) {
+        return res.status(response.status).json(data);
+      }
+      res.json(data);
+    } catch (error: any) {
+      console.error("OpenAI Proxy Error:", error);
+      res.status(500).json({ error: "Failed to connect to OpenAI", details: error.message });
+    }
+  });
+
+  // Fallback for unknown API routes to prevent SPA fallback
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
   });
 
   // Vite middleware for development

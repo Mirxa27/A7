@@ -1,189 +1,111 @@
+/**
+ * Tactical Audio Service
+ * Generates synthesizer-based sound effects for the surveillance interface.
+ */
 
-// Procedural Audio Generation for UI Feedback
-// No external assets required. Pure Web Audio API.
-
-class AudioController {
+class AudioService {
   private ctx: AudioContext | null = null;
   private enabled: boolean = true;
-  private masterGain: GainNode | null = null;
-
-  constructor() {
-    try {
-      // Initialize on first user interaction to bypass autoplay policy
-      window.addEventListener('click', () => this.init(), { once: true });
-      window.addEventListener('keydown', () => this.init(), { once: true });
-    } catch (e) {
-      console.error("Audio Context initialization failed", e);
-    }
-  }
 
   private init() {
-    if (this.ctx) return;
-    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
-    this.ctx = new AudioContextClass();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.3; // Default volume
-    this.masterGain.connect(this.ctx.destination);
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
   }
 
   public setEnabled(enabled: boolean) {
     this.enabled = enabled;
-    if (this.masterGain) {
-      this.masterGain.gain.setTargetAtTime(enabled ? 0.3 : 0, this.ctx?.currentTime || 0, 0.1);
-    }
   }
 
-  public isEnabled() {
-    return this.enabled;
-  }
+  private playTone(freq: number, type: OscillatorType, duration: number, volume: number = 0.1) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
 
-  // --- SOUND EFFECTS ---
-
-  public playHover() {
-    if (!this.ctx || !this.enabled) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
     
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.05);
-    
-    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+    gain.gain.setValueAtTime(volume, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
 
     osc.connect(gain);
-    gain.connect(this.masterGain!);
+    gain.connect(this.ctx.destination);
+
     osc.start();
-    osc.stop(this.ctx.currentTime + 0.05);
+    osc.stop(this.ctx.currentTime + duration);
   }
 
   public playClick() {
-    if (!this.ctx || !this.enabled) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
+    this.playTone(1200, 'sine', 0.05, 0.02);
+  }
 
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.1);
+  public playHover() {
+    this.playTone(800, 'sine', 0.03, 0.01);
+  }
 
-    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+  public playNotification() {
+    this.playTone(880, 'sine', 0.1, 0.05);
+    setTimeout(() => this.playTone(1320, 'sine', 0.1, 0.05), 50);
+  }
 
-    osc.connect(gain);
-    gain.connect(this.masterGain!);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.1);
+  public playAlert() {
+    this.playTone(440, 'square', 0.2, 0.05);
+    setTimeout(() => this.playTone(440, 'square', 0.2, 0.05), 200);
+    setTimeout(() => this.playTone(440, 'square', 0.2, 0.05), 400);
   }
 
   public playSuccess() {
-    if (!this.ctx || !this.enabled) return;
-    const t = this.ctx.currentTime;
-    
-    // Arpeggio
-    [880, 1108, 1318].forEach((freq, i) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-      
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, t + i * 0.1);
-      
-      gain.gain.setValueAtTime(0.1, t + i * 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 0.3);
-
-      osc.connect(gain);
-      gain.connect(this.masterGain!);
-      osc.start(t + i * 0.1);
-      osc.stop(t + i * 0.1 + 0.3);
-    });
+    this.playTone(660, 'sine', 0.1, 0.05);
+    setTimeout(() => this.playTone(880, 'sine', 0.2, 0.05), 100);
   }
 
   public playError() {
-    if (!this.ctx || !this.enabled) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
-    osc.frequency.linearRampToValueAtTime(100, this.ctx.currentTime + 0.3);
-    
-    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+    this.playTone(220, 'sawtooth', 0.3, 0.05);
+    setTimeout(() => this.playTone(110, 'sawtooth', 0.4, 0.05), 100);
+  }
 
-    osc.connect(gain);
-    gain.connect(this.masterGain!);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.3);
+  public playDataIngest() {
+    this.playTone(1760, 'sine', 0.05, 0.02);
   }
 
   public playTyping() {
-    if (!this.ctx || !this.enabled) return;
-    // High frequency blip
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    // Variation
-    const freq = 800 + Math.random() * 200;
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-    
-    gain.gain.setValueAtTime(0.03, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.03);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain!);
-    osc.start();
-    osc.stop(this.ctx.currentTime + 0.03);
+    this.playTone(Math.random() * 100 + 400, 'square', 0.02, 0.02);
   }
 
-  // --- AUDIO DECODING HELPERS FOR GEMINI TTS ---
-  
-  public async playAudioBuffer(base64String: string) {
-     if (!this.ctx) this.init();
-     if (!this.ctx) return; // Should not happen if init worked
-
-     try {
-        const binaryString = atob(base64String);
+  public async playAudio(data: string | ArrayBuffer) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    
+    try {
+      let buffer: ArrayBuffer;
+      if (typeof data === 'string') {
+        const binaryString = window.atob(data);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
+          bytes[i] = binaryString.charCodeAt(i);
         }
+        buffer = bytes.buffer;
+      } else {
+        buffer = data;
+      }
 
-        // Gemini returns raw PCM at 24000Hz (usually).
-        // Check for alignment issues. Int16Array requires buffer byteLength to be a multiple of 2.
-        let buffer = bytes.buffer;
-        if (bytes.byteLength % 2 !== 0) {
-            // Pad with one extra byte if odd
-            const padded = new Uint8Array(bytes.byteLength + 1);
-            padded.set(bytes);
-            buffer = padded.buffer;
-        }
-
-        // 16-bit signed integer, Little Endian, 24kHz, 1 channel (usually)
-        const int16 = new Int16Array(buffer);
-        const sampleRate = 24000;
-        const channels = 1;
-        const frameCount = int16.length;
-
-        const audioBuffer = this.ctx.createBuffer(channels, frameCount, sampleRate);
-        const channelData = audioBuffer.getChannelData(0);
-
-        for (let i = 0; i < frameCount; i++) {
-             // Convert Int16 to Float32 [-1.0, 1.0]
-             channelData[i] = int16[i] / 32768.0;
-        }
-
-        const source = this.ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(this.masterGain!);
-        source.start();
-
-     } catch (e) {
-         console.error("Failed to decode/play audio", e);
-         this.playError();
-     }
+      const audioBuffer = await this.ctx.decodeAudioData(buffer);
+      const source = this.ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.ctx.destination);
+      source.start();
+    } catch (e) {
+      console.error('Failed to play audio', e);
+    }
   }
 }
 
-export const audio = new AudioController();
+export const audio = new AudioService();
