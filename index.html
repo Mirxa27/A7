@@ -4,13 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agent7 Intelligence Interface</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='15' fill='%23020617'/%3E%3Ctext x='50' y='68' font-size='50' text-anchor='middle' fill='%2310b981' font-family='monospace'%3EA7%3C/text%3E%3C/svg%3E" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
+      /* Tailwind CSS Base Styles */
+      *, ::before, ::after {
+        box-sizing: border-box;
+        border-width: 0;
+        border-style: solid;
+        border-color: #e5e7eb;
+      }
       body {
-        background-color: #020617; /* slate-950 */
-        color: #e2e8f0; /* slate-200 */
-        font-family: 'Share Tech Mono', monospace; /* Tech look */
+        margin: 0;
+        line-height: 1.5;
+        background-color: #020617;
+        color: #e2e8f0;
+        font-family: 'Share Tech Mono', monospace;
         cursor: crosshair;
         overflow: hidden;
       }
@@ -23,7 +32,7 @@
         background: rgba(15, 23, 42, 0.5); 
       }
       ::-webkit-scrollbar-thumb {
-        background: #10b981; /* emerald-500 */
+        background: #10b981;
         border-radius: 2px;
       }
       ::-webkit-scrollbar-thumb:hover {
@@ -74,6 +83,24 @@
       .flicker {
         animation: flicker 0.15s infinite;
       }
+      /* Utility classes */
+      .flex { display: flex; }
+      .grid { display: grid; }
+      .hidden { display: none; }
+      .block { display: block; }
+      .inline-block { display: inline-block; }
+      .absolute { position: absolute; }
+      .relative { position: relative; }
+      .fixed { position: fixed; }
+      .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+      .w-full { width: 100%; }
+      .h-full { height: 100%; }
+      .min-h-screen { min-height: 100vh; }
+      .pointer-events-none { pointer-events: none; }
+      .z-50 { z-index: 50; }
+      .z-\[60\] { z-index: 60; }
+      .z-\[61\] { z-index: 61; }
+      .z-\[62\] { z-index: 62; }
     </style>
   <script type="importmap">
 {

@@ -132,21 +132,29 @@ export const auditLogger = (req: any, res: any, next: any) => {
 // Request sanitization
 export const sanitizeInput = (req: any, res: any, next: any) => {
   // Remove potentially dangerous characters from string inputs
-  const sanitize = (obj: any) => {
+  const sanitize = (obj: any): any => {
     if (typeof obj === 'string') {
       return obj.replace(/[<>\"']/g, '');
     }
+    if (Array.isArray(obj)) {
+      return obj.map(item => sanitize(item));
+    }
     if (typeof obj === 'object' && obj !== null) {
+      const sanitized: any = {};
       for (const key in obj) {
-        obj[key] = sanitize(obj[key]);
+        if (obj.hasOwnProperty(key)) {
+          sanitized[key] = sanitize(obj[key]);
+        }
       }
+      return sanitized;
     }
     return obj;
   };
   
-  req.body = sanitize(req.body);
-  req.query = sanitize(req.query);
-  req.params = sanitize(req.params);
+  // Only sanitize body - query and params are read-only in Express 5
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitize(req.body);
+  }
   
   next();
 };
