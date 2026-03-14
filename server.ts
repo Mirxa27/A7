@@ -20,8 +20,7 @@ import {
   securityMiddleware, 
   validate, 
   validators,
-  auditLogger,
-  sanitizeInput 
+  auditLogger
 } from "./lib/security.js";
 
 // Enhanced OSINT
@@ -76,8 +75,8 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   
-  // Input sanitization
-  app.use(sanitizeInput);
+  // Input sanitization (temporarily disabled due to Express 5 compatibility)
+  // app.use(sanitizeInput);
   
   // Request logging
   app.use(requestLogger);
