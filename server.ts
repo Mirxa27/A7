@@ -1,4 +1,5 @@
 import express from "express";
+import { createServer as createHttpServer } from "http";
 import { createServer as createViteServer } from "vite";
 import { supabase } from "./lib/supabase.js";
 import "dotenv/config";
@@ -46,7 +47,7 @@ const resolveNs = promisify(dns.resolveNs);
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = parseInt(process.env.PORT || '3000', 10);
 
   app.use(...securityMiddleware);
   app.use(express.json({ limit: '10mb' }));
@@ -771,11 +772,13 @@ async function startServer() {
     });
   });
 
+  const httpServer = createHttpServer(app);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: { host: '0.0.0.0' }
+        hmr: { server: httpServer }
       },
       appType: "spa",
     });
@@ -802,7 +805,7 @@ async function startServer() {
     });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     logger.info(`Agent7 Intelligence Interface started`, {
       port: PORT,
       environment: process.env.NODE_ENV || 'development',
