@@ -1,8 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import * as prismaClient from "@prisma/client";
-const PrismaClient = (prismaClient as any).PrismaClient;
-import { withAccelerate } from "@prisma/extension-accelerate";
+import { supabase } from "./lib/supabase.js";
 import "dotenv/config";
 import dns from "dns";
 import { promisify } from "util";
@@ -13,36 +11,27 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 
-// Security & middleware
-import { 
-  apiLimiter, 
-  osintLimiter, 
-  aiLimiter, 
-  securityMiddleware, 
-  validate, 
+import {
+  apiLimiter,
+  osintLimiter,
+  aiLimiter,
+  securityMiddleware,
+  validate,
   validators,
   auditLogger
 } from "./lib/security.js";
 
-// Enhanced OSINT
-import { 
-  geolocateIP, 
-  searchUsernameEnhanced, 
+import {
+  geolocateIP,
+  searchUsernameEnhanced,
   checkEmailBreaches,
   enumerateSubdomains,
-  getSSLInfo 
+  getSSLInfo
 } from "./lib/osintEnhanced.js";
 
-// Cache
 import { CacheService } from "./lib/cache.js";
-
-// Job Queue
 import { jobQueue } from "./lib/jobQueue.js";
-
-// Logger
 import { logger, requestLogger, logOsintOperation, logAIOperation } from "./lib/logger.js";
-
-// Export Service
 import { exportService } from "./lib/exportService.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,37 +44,15 @@ const resolveMx = promisify(dns.resolveMx);
 const resolveTxt = promisify(dns.resolveTxt);
 const resolveNs = promisify(dns.resolveNs);
 
-// Initialize Prisma with Accelerate extension
-const prisma = process.env.DATABASE_URL?.includes('accelerate')
-  ? new PrismaClient({
-      accelerateUrl: process.env.DATABASE_URL,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    }).$extends(withAccelerate())
-  : new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    });
-
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
-  // Apply security middleware
   app.use(...securityMiddleware);
-  
-  // Body parsing
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  
-  // Input sanitization (temporarily disabled due to Express 5 compatibility)
-  // app.use(sanitizeInput);
-  
-  // Request logging
   app.use(requestLogger);
-  
-  // Audit logging for API routes
   app.use('/api', auditLogger);
-
-  // Apply rate limiting
   app.use('/api/', apiLimiter);
   app.use('/api/osint/', osintLimiter);
   app.use('/api/ai/', aiLimiter);
@@ -95,10 +62,10 @@ async function startServer() {
   // ============================================
   // HEALTH & STATUS ENDPOINTS
   // ============================================
-  
+
   app.get("/api/health", (req, res) => {
-    res.json({ 
-      status: "operational", 
+    res.json({
+      status: "operational",
       timestamp: new Date().toISOString(),
       version: "1.0.0",
       environment: process.env.NODE_ENV || 'development'
@@ -107,14 +74,11 @@ async function startServer() {
 
   app.get("/api/status", async (req, res) => {
     try {
-      // Test database connection
-      await prisma.$queryRaw`SELECT 1`;
-      
-      // Get cache stats
+      const { error: dbError } = await supabase.from('intel_records').select('count').limit(1);
       const cacheStats = CacheService.getStats();
-      
+
       res.json({
-        database: "connected",
+        database: dbError ? "disconnected" : "connected",
         aiProxy: "ready",
         osintTools: "ready",
         cache: cacheStats,
@@ -138,7 +102,7 @@ async function startServer() {
   // ============================================
   // CACHE MANAGEMENT
   // ============================================
-  
+
   app.get("/api/admin/cache/stats", (req, res) => {
     res.json(CacheService.getStats());
   });
@@ -149,48 +113,41 @@ async function startServer() {
       CacheService.flushOsint();
       logger.info('OSINT cache cleared');
     } else if (type === 'ai') {
-      // AI cache clear would go here
       logger.info('AI cache cleared');
     }
     res.json({ success: true, message: `Cache ${type} cleared` });
   });
 
   // ============================================
-  // INTEL RECORDS API (Enhanced)
+  // INTEL RECORDS API
   // ============================================
-  
+
   app.get("/api/intel", async (req, res) => {
     try {
       const { type, clearance, limit = '100', search, offset = '0' } = req.query;
-      
-      const where: any = {};
-      if (type) where.type = type;
-      if (clearance) where.clearance = clearance;
+
+      let query = supabase.from('intel_records').select('*', { count: 'exact' });
+
+      if (type) query = query.eq('type', type);
+      if (clearance) query = query.eq('clearance', clearance);
       if (search) {
-        where.OR = [
-          { title: { contains: search as string, mode: 'insensitive' } },
-          { details: { contains: search as string, mode: 'insensitive' } },
-          { source: { contains: search as string, mode: 'insensitive' } }
-        ];
+        query = query.or(`title.ilike.%${search}%,details.ilike.%${search}%,source.ilike.%${search}%`);
       }
 
-      const [records, total] = await Promise.all([
-        (prisma as any).intelRecord.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          take: parseInt(limit as string),
-          skip: parseInt(offset as string)
-        }),
-        (prisma as any).intelRecord.count({ where })
-      ]);
-      
+      query = query
+        .order('created_at', { ascending: false })
+        .range(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string) - 1);
+
+      const { data: records, count, error } = await query;
+      if (error) throw error;
+
       res.json({
-        records,
+        records: records || [],
         pagination: {
-          total,
+          total: count || 0,
           limit: parseInt(limit as string),
           offset: parseInt(offset as string),
-          hasMore: total > (parseInt(offset as string) + parseInt(limit as string))
+          hasMore: (count || 0) > (parseInt(offset as string) + parseInt(limit as string))
         }
       });
     } catch (error) {
@@ -202,14 +159,17 @@ async function startServer() {
   app.get("/api/intel/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const record = await (prisma as any).intelRecord.findUnique({
-        where: { id }
-      });
-      
+      const { data: record, error } = await supabase
+        .from('intel_records')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
       if (!record) {
         return res.status(404).json({ error: "Intel record not found" });
       }
-      
+
       res.json(record);
     } catch (error) {
       logger.error('Error fetching intel record', { error, id: req.params.id });
@@ -221,8 +181,9 @@ async function startServer() {
     try {
       const { title, type, date, clearance, details, tags, source } = req.body;
 
-      const record = await prisma.intelRecord.create({
-        data: {
+      const { data: record, error } = await supabase
+        .from('intel_records')
+        .insert({
           title,
           type,
           date,
@@ -230,9 +191,12 @@ async function startServer() {
           details: details || null,
           tags: tags || [],
           source: source || null
-        }
-      });
-      
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
       logger.info('Intel record created', { id: record.id, title, type });
       res.status(201).json(record);
     } catch (error) {
@@ -245,20 +209,25 @@ async function startServer() {
     try {
       const { id } = req.params;
       const { title, type, date, clearance, details, tags, source } = req.body;
-      
-      const record = await prisma.intelRecord.update({
-        where: { id },
-        data: {
-          ...(title && { title }),
-          ...(type && { type }),
-          ...(date && { date }),
-          ...(clearance && { clearance }),
-          ...(details !== undefined && { details }),
-          ...(tags && { tags }),
-          ...(source !== undefined && { source })
-        }
-      });
-      
+
+      const updateData: any = {};
+      if (title) updateData.title = title;
+      if (type) updateData.type = type;
+      if (date) updateData.date = date;
+      if (clearance) updateData.clearance = clearance;
+      if (details !== undefined) updateData.details = details;
+      if (tags) updateData.tags = tags;
+      if (source !== undefined) updateData.source = source;
+
+      const { data: record, error } = await supabase
+        .from('intel_records')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
       logger.info('Intel record updated', { id });
       res.json(record);
     } catch (error) {
@@ -270,10 +239,13 @@ async function startServer() {
   app.delete("/api/intel/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      await prisma.intelRecord.delete({
-        where: { id }
-      });
-      
+      const { error } = await supabase
+        .from('intel_records')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       logger.info('Intel record deleted', { id });
       res.json({ success: true, message: "Intel record deleted" });
     } catch (error) {
@@ -283,14 +255,13 @@ async function startServer() {
   });
 
   // ============================================
-  // OSINT ENDPOINTS (Enhanced)
+  // OSINT ENDPOINTS
   // ============================================
 
-  // Comprehensive DNS lookup
   app.get("/api/osint/dns/:domain", validate([validators.domain]), async (req, res) => {
     try {
       const { domain } = req.params;
-      
+
       const [records, mxRecords, txtRecords, nsRecords] = await Promise.allSettled([
         resolveAny(domain),
         resolveMx(domain),
@@ -312,15 +283,14 @@ async function startServer() {
       res.json(result);
     } catch (error: any) {
       logOsintOperation('dns_lookup', req.params.domain, false, { error: error.message });
-      res.status(500).json({ 
-        error: "DNS lookup failed", 
+      res.status(500).json({
+        error: "DNS lookup failed",
         details: error.message,
         domain: req.params.domain
       });
     }
   });
 
-  // Subdomain enumeration
   app.get("/api/osint/subdomains/:domain", async (req, res) => {
     try {
       const { domain } = req.params;
@@ -333,7 +303,6 @@ async function startServer() {
     }
   });
 
-  // SSL Certificate info
   app.get("/api/osint/ssl/:domain", async (req, res) => {
     try {
       const { domain } = req.params;
@@ -346,7 +315,6 @@ async function startServer() {
     }
   });
 
-  // IP to domain reverse lookup
   app.get("/api/osint/reverse/:ip", validate([validators.ip]), async (req, res) => {
     try {
       const { ip } = req.params;
@@ -359,7 +327,6 @@ async function startServer() {
     }
   });
 
-  // IP Geolocation
   app.get("/api/osint/geolocation/:ip", validate([validators.ip]), async (req, res) => {
     try {
       const { ip } = req.params;
@@ -372,7 +339,6 @@ async function startServer() {
     }
   });
 
-  // WHOIS lookup
   app.get("/api/osint/whois/:domain", async (req, res) => {
     try {
       const { domain } = req.params;
@@ -385,21 +351,20 @@ async function startServer() {
       });
     } catch (error: any) {
       logOsintOperation('whois', req.params.domain, false, { error: error.message });
-      res.status(500).json({ 
-        error: "WHOIS lookup failed", 
+      res.status(500).json({
+        error: "WHOIS lookup failed",
         details: error.message,
         domain: req.params.domain
       });
     }
   });
 
-  // Phone number validation and formatting
   app.get("/api/osint/phone/:phone", async (req, res) => {
     try {
       const { phone } = req.params;
       const cleanPhone = decodeURIComponent(phone).replace(/\s+/g, '');
       const phoneNumber = parsePhoneNumberFromString(cleanPhone);
-      
+
       if (phoneNumber) {
         logOsintOperation('phone_lookup', cleanPhone, true);
         res.json({
@@ -415,7 +380,7 @@ async function startServer() {
           uri: phoneNumber.getURI(),
         });
       } else {
-        res.status(400).json({ 
+        res.status(400).json({
           error: "Invalid phone number format",
           input: cleanPhone
         });
@@ -426,14 +391,13 @@ async function startServer() {
     }
   });
 
-  // Enhanced username/Handle lookup across platforms
   app.get("/api/osint/username/:username", validate([validators.username]), async (req, res) => {
     try {
       const { username } = req.params;
       const result = await searchUsernameEnhanced(username);
-      logOsintOperation('username_search', username, true, { 
+      logOsintOperation('username_search', username, true, {
         found: result.summary.found,
-        total: result.summary.total 
+        total: result.summary.total
       });
       res.json(result);
     } catch (error: any) {
@@ -442,20 +406,15 @@ async function startServer() {
     }
   });
 
-  // Email verification and breach check
   app.get("/api/osint/email/:email", validate([validators.email]), async (req, res) => {
     try {
       const { email } = req.params;
       const decodedEmail = decodeURIComponent(email);
-      
-      // Basic validation
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const isValid = emailRegex.test(decodedEmail);
-      
-      // Extract domain
       const domain = decodedEmail.split('@')[1];
-      
-      // Check MX records
+
       let mxRecords: any[] = [];
       try {
         mxRecords = await resolveMx(domain);
@@ -463,7 +422,6 @@ async function startServer() {
         // Domain might not have MX records
       }
 
-      // Check breaches if API key is configured
       let breachData = null;
       if (process.env.HIBP_API_KEY) {
         breachData = await checkEmailBreaches(decodedEmail, process.env.HIBP_API_KEY);
@@ -487,17 +445,17 @@ async function startServer() {
   });
 
   // ============================================
-  // AI PROXY ENDPOINTS (Enhanced)
+  // AI PROXY ENDPOINTS
   // ============================================
 
   app.post("/api/ai/huggingface", async (req, res) => {
     const startTime = Date.now();
-    
+
     try {
       const { endpoint, payload, apiKey } = req.body;
-      
+
       if (!endpoint || !payload || !apiKey) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Missing required parameters",
           required: ['endpoint', 'payload', 'apiKey']
         });
@@ -511,10 +469,10 @@ async function startServer() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
@@ -525,34 +483,34 @@ async function startServer() {
         logAIOperation('huggingface', req.body?.model || 'unknown', false, Date.now() - startTime);
         return res.status(response.status).json(data);
       }
-      
+
       logAIOperation('huggingface', req.body?.model || 'unknown', true, Date.now() - startTime);
       res.json(data);
     } catch (error: any) {
       logAIOperation('huggingface', req.body?.model || 'unknown', false, Date.now() - startTime);
       logger.error('Hugging Face Proxy Error', { error: error.message });
-      res.status(500).json({ 
-        error: "Failed to connect to Hugging Face", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to connect to Hugging Face",
+        details: error.message
       });
     }
   });
 
   app.post("/api/ai/openai", async (req, res) => {
     const startTime = Date.now();
-    
+
     try {
       const { baseUrl, payload, apiKey } = req.body;
-      
+
       if (!payload || !apiKey) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Missing required parameters",
           required: ['payload', 'apiKey']
         });
       }
 
       const url = `${baseUrl || 'https://api.openai.com/v1'}/chat/completions`;
-      
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -561,10 +519,10 @@ async function startServer() {
         },
         body: JSON.stringify(payload)
       });
-      
+
       const contentType = response.headers.get("content-type");
       let data;
-      
+
       if (contentType && contentType.includes("application/json")) {
         data = await response.json();
       } else {
@@ -575,27 +533,27 @@ async function startServer() {
         logAIOperation('openai', payload?.model || 'unknown', false, Date.now() - startTime);
         return res.status(response.status).json(data);
       }
-      
+
       logAIOperation('openai', payload?.model || 'unknown', true, Date.now() - startTime);
       res.json(data);
     } catch (error: any) {
       logAIOperation('openai', req.body?.payload?.model || 'unknown', false, Date.now() - startTime);
       logger.error('OpenAI Proxy Error', { error: error.message });
-      res.status(500).json({ 
-        error: "Failed to connect to OpenAI", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to connect to OpenAI",
+        details: error.message
       });
     }
   });
 
   app.post("/api/ai/gemini", async (req, res) => {
     const startTime = Date.now();
-    
+
     try {
       const { model, contents, config, apiKey } = req.body;
-      
+
       if (!contents || !apiKey) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Missing required parameters",
           required: ['contents', 'apiKey']
         });
@@ -603,7 +561,7 @@ async function startServer() {
 
       const modelName = model || 'gemini-2.0-flash';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
@@ -614,22 +572,22 @@ async function startServer() {
           ...(config && { generationConfig: config })
         })
       });
-      
+
       const data = await response.json();
 
       if (!response.ok) {
         logAIOperation('gemini', modelName, false, Date.now() - startTime);
         return res.status(response.status).json(data);
       }
-      
+
       logAIOperation('gemini', modelName, true, Date.now() - startTime);
       res.json(data);
     } catch (error: any) {
       logAIOperation('gemini', req.body?.model || 'unknown', false, Date.now() - startTime);
       logger.error('Gemini Proxy Error', { error: error.message });
-      res.status(500).json({ 
-        error: "Failed to connect to Gemini", 
-        details: error.message 
+      res.status(500).json({
+        error: "Failed to connect to Gemini",
+        details: error.message
       });
     }
   });
@@ -640,14 +598,14 @@ async function startServer() {
 
   app.post("/api/jobs", (req, res) => {
     const { type, data } = req.body;
-    
+
     if (!type || !data) {
       return res.status(400).json({ error: "Missing type or data" });
     }
 
     const jobId = jobQueue.addJob(type, data);
     logger.info('Job created', { jobId, type });
-    
+
     res.status(201).json({
       jobId,
       status: 'pending',
@@ -668,18 +626,18 @@ async function startServer() {
   app.get("/api/jobs/:id", (req, res) => {
     const { id } = req.params;
     const job = jobQueue.getJob(id);
-    
+
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
-    
+
     res.json(job);
   });
 
   app.delete("/api/jobs/:id", (req, res) => {
     const { id } = req.params;
     const cancelled = jobQueue.cancelJob(id);
-    
+
     if (cancelled) {
       logger.info('Job cancelled', { jobId: id });
       res.json({ success: true, message: "Job cancelled" });
@@ -695,13 +653,13 @@ async function startServer() {
   app.post("/api/export/dossier", async (req, res) => {
     try {
       const { data, format = 'pdf', classification = 'CONFIDENTIAL' } = req.body;
-      
+
       if (!data) {
         return res.status(400).json({ error: "Missing dossier data" });
       }
 
       let filepath: string;
-      
+
       switch (format) {
         case 'pdf':
           filepath = await exportService.generatePDFDossier(data, { format, classification });
@@ -715,7 +673,7 @@ async function startServer() {
 
       const info = exportService.getExportInfo(filepath);
       logger.info('Dossier exported', { format, filename: info?.filename });
-      
+
       res.json({
         success: true,
         downloadUrl: `/api/export/download/${path.basename(filepath)}`,
@@ -730,16 +688,16 @@ async function startServer() {
   app.post("/api/export/mission", async (req, res) => {
     try {
       const { data, classification = 'TOP SECRET' } = req.body;
-      
+
       if (!data) {
         return res.status(400).json({ error: "Missing mission data" });
       }
 
       const filepath = await exportService.generatePDFMission(data, { format: 'pdf', classification });
       const info = exportService.getExportInfo(filepath);
-      
+
       logger.info('Mission exported', { filename: info?.filename });
-      
+
       res.json({
         success: true,
         downloadUrl: `/api/export/download/${path.basename(filepath)}`,
@@ -754,11 +712,11 @@ async function startServer() {
   app.get("/api/export/download/:filename", (req, res) => {
     const { filename } = req.params;
     const filepath = path.join(process.cwd(), 'exports', filename);
-    
+
     if (!fs.existsSync(filepath)) {
       return res.status(404).json({ error: "File not found" });
     }
-    
+
     res.download(filepath);
   });
 
@@ -778,9 +736,8 @@ async function startServer() {
   // STATIC FILES & SPA FALLBACK
   // ============================================
 
-  // Fallback for unknown API routes
   app.use('/api', (req, res) => {
-    res.status(404).json({ 
+    res.status(404).json({
       error: `API route not found: ${req.method} ${req.path}`,
       available: [
         'GET /api/health',
@@ -814,10 +771,9 @@ async function startServer() {
     });
   });
 
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { 
+      server: {
         middlewareMode: true,
         hmr: { host: '0.0.0.0' }
       },
@@ -825,46 +781,41 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files in production
     app.use(express.static(path.join(__dirname, 'dist')));
-    
-    // SPA fallback
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
 
-  // Global error handler
   app.use((err: any, req: any, res: any, next: any) => {
-    logger.error('Unhandled error', { 
+    logger.error('Unhandled error', {
       error: err.message,
       stack: err.stack,
       path: req.path,
       method: req.method
     });
-    
+
     res.status(err.status || 500).json({
-      error: process.env.NODE_ENV === 'production' 
-        ? 'Internal server error' 
+      error: process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
         : err.message
     });
   });
 
-  // Start server
   app.listen(PORT, "0.0.0.0", () => {
     logger.info(`Agent7 Intelligence Interface started`, {
       port: PORT,
       environment: process.env.NODE_ENV || 'development',
-      database: process.env.DATABASE_URL?.includes('accelerate') ? 'Prisma Accelerate' : 'Direct'
+      database: 'Supabase'
     });
-    
+
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║         AGENT7 INTELLIGENCE INTERFACE v1.0.0               ║
 ╠════════════════════════════════════════════════════════════╣
 ║  Server: http://localhost:${PORT}                            ║
 ║  Environment: ${process.env.NODE_ENV || 'development'}                            ║
-║  Database: ${process.env.DATABASE_URL?.includes('accelerate') ? 'Prisma Accelerate' : 'Direct'}                    ║
+║  Database: Supabase                                        ║
 ║  Cache: Enabled                                            ║
 ║  Rate Limiting: Enabled                                    ║
 ║  Security: Enabled                                         ║
@@ -873,20 +824,16 @@ async function startServer() {
   });
 }
 
-// Handle graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await prisma.$disconnect();
   process.exit(0);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception', { error: error.message, stack: error.stack });
   process.exit(1);

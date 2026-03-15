@@ -102,8 +102,8 @@ export class ExportService {
       doc.fontSize(14).text('SOCIAL FOOTPRINT', { underline: true }).moveDown(0.5);
       
       data.socialProfiles.forEach((profile, index) => {
-        doc.fontSize(12).text(`${index + 1}. ${profile.platform}`, { bold: true });
-        doc.fontSize(11)
+        doc.fontSize(12).font('Helvetica-Bold').text(`${index + 1}. ${profile.platform}`);
+        doc.fontSize(11).font('Helvetica')
            .text(`   Username: ${profile.username}`)
            .text(`   URL: ${profile.url}`)
            .text(`   Status: ${profile.status}`)
@@ -119,7 +119,7 @@ export class ExportService {
       data.sources.forEach((source, index) => {
         doc.fontSize(11)
            .text(`${index + 1}. ${source.title}`)
-           .text(`   ${source.uri}`, { color: 'blue' })
+           .fillColor('blue').text(`   ${source.uri}`).fillColor('black')
            .moveDown(0.3);
       });
     }
