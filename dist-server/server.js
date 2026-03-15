@@ -687,8 +687,8 @@ async function startServer() {
             ]
         });
     });
-    const httpServer = createHttpServer(app);
     if (process.env.NODE_ENV !== "production") {
+        const httpServer = createHttpServer(app);
         const vite = await createViteServer({
             server: {
                 middlewareMode: true,
@@ -697,45 +697,37 @@ async function startServer() {
             appType: "spa",
         });
         app.use(vite.middlewares);
+        app.use((err, req, res, next) => {
+            logger.error('Unhandled error', { error: err.message, stack: err.stack, path: req.path, method: req.method });
+            res.status(err.status || 500).json({ error: err.message });
+        });
+        httpServer.listen(PORT, "0.0.0.0", () => {
+            logger.info(`Agent7 Intelligence Interface started`, {
+                port: PORT,
+                environment: process.env.NODE_ENV || 'development',
+                database: 'Supabase'
+            });
+            console.log(`Server running at http://localhost:${PORT}`);
+        });
     }
     else {
         app.use(express.static(path.join(__dirname, 'dist')));
         app.get('*', (req, res) => {
             res.sendFile(path.join(__dirname, 'dist', 'index.html'));
         });
+        app.use((err, req, res, next) => {
+            logger.error('Unhandled error', { error: err.message, stack: err.stack, path: req.path, method: req.method });
+            res.status(err.status || 500).json({ error: 'Internal server error' });
+        });
+        app.listen(PORT, "0.0.0.0", () => {
+            logger.info(`Agent7 Intelligence Interface started`, {
+                port: PORT,
+                environment: 'production',
+                database: 'Supabase'
+            });
+            console.log(`Server running at http://localhost:${PORT}`);
+        });
     }
-    app.use((err, req, res, next) => {
-        logger.error('Unhandled error', {
-            error: err.message,
-            stack: err.stack,
-            path: req.path,
-            method: req.method
-        });
-        res.status(err.status || 500).json({
-            error: process.env.NODE_ENV === 'production'
-                ? 'Internal server error'
-                : err.message
-        });
-    });
-    httpServer.listen(PORT, "0.0.0.0", () => {
-        logger.info(`Agent7 Intelligence Interface started`, {
-            port: PORT,
-            environment: process.env.NODE_ENV || 'development',
-            database: 'Supabase'
-        });
-        console.log(`
-╔════════════════════════════════════════════════════════════╗
-║         AGENT7 INTELLIGENCE INTERFACE v1.0.0               ║
-╠════════════════════════════════════════════════════════════╣
-║  Server: http://localhost:${PORT}                            ║
-║  Environment: ${process.env.NODE_ENV || 'development'}                            ║
-║  Database: Supabase                                        ║
-║  Cache: Enabled                                            ║
-║  Rate Limiting: Enabled                                    ║
-║  Security: Enabled                                         ║
-╚════════════════════════════════════════════════════════════╝
-    `);
-    });
 }
 process.on('SIGTERM', async () => {
     logger.info('SIGTERM received, shutting down gracefully');
