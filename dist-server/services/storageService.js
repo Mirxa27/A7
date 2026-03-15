@@ -43,7 +43,8 @@ export const getIntelRecords = async () => {
         const response = await fetch('/api/intel');
         if (!response.ok)
             throw new Error('Failed to fetch intel records');
-        return await response.json();
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.records ?? []);
     }
     catch (e) {
         console.error("API Error", e);
