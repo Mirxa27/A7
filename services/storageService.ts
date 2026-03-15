@@ -1,4 +1,4 @@
-import { IntelRecord, Asset, MissionPlan, SystemLog, AISettings, Target } from '../types';
+import { IntelRecord, Asset, MissionPlan, SystemLog, AISettings, Target } from '../types.js';
 
 const INTEL_KEY = 'agent7_intel_db';
 const ASSETS_KEY = 'agent7_assets';

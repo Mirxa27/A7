@@ -11,12 +11,12 @@ export async function geolocateIP(ip: string) {
     const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting`);
     const data = await response.json();
     
-    if (data.status === 'success') {
+    if ((data as any).status === 'success') {
       CacheService.setOsint(cacheKey, data, 86400); // Cache for 24 hours
       return data;
     }
     
-    throw new Error(data.message || 'IP geolocation failed');
+    throw new Error((data as any).message || 'IP geolocation failed');
   } catch (error: any) {
     console.error('IP geolocation error:', error);
     throw error;
@@ -190,8 +190,8 @@ export async function checkEmailBreaches(email: string, apiKey?: string) {
     const result = {
       email,
       breached: true,
-      breachCount: breaches.length,
-      breaches: breaches.map((b: any) => ({
+      breachCount: (breaches as any).length,
+      breaches: (breaches as any).map((b: any) => ({
         name: b.Name,
         title: b.Title,
         domain: b.Domain,
@@ -236,7 +236,7 @@ export async function enumerateSubdomains(domain: string) {
     
     // Extract unique subdomains
     const subdomains = [...new Set(
-      data.map((entry: any) => entry.name_value)
+      (data as any).map((entry: any) => entry.name_value)
         .filter((name: string) => name && name.endsWith(domain))
         .map((name: string) => name.trim().toLowerCase())
     )].sort();
@@ -280,8 +280,8 @@ export async function getSSLInfo(domain: string) {
     const result = {
       domain,
       timestamp: new Date().toISOString(),
-      status: data.status,
-      endpoints: data.endpoints?.map((ep: any) => ({
+      status: (data as any).status,
+      endpoints: (data as any).endpoints?.map((ep: any) => ({
         ip: ep.ipAddress,
         grade: ep.grade,
         hasWarnings: ep.hasWarnings,
@@ -299,8 +299,8 @@ export async function getSSLInfo(domain: string) {
           }
         }
       })) || [],
-      host: data.host,
-      port: data.port
+      host: (data as any).host,
+      port: (data as any).port
     };
 
     CacheService.setOsint(cacheKey, result, 21600); // Cache for 6 hours

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
-    "start": "node server.ts",
+    "build": "npm run build:vite && npm run build:server",
+    "build:vite": "vite build",
+    "build:server": "tsc --project tsconfig.server.json",
+    "start": "node dist-server/server.js",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "db:generate": "prisma generate",

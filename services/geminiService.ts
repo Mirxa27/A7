@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, PersonaProfile, BehavioralForecast, Asset, MissionPlan, TargetDossier, Source, ForensicArtifact, AISettings } from '../types';
-import { addSystemLog, getSettings } from './storageService';
+import { AnalysisResult, PersonaProfile, BehavioralForecast, Asset, MissionPlan, TargetDossier, Source, ForensicArtifact, AISettings } from '../types.js';
+import { addSystemLog, getSettings } from './storageService.js';
 
 // ================================================
 // IMPROVED CORE – DEEP RESEARCH EDITION (2026)

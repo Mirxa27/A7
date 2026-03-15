@@ -1,6 +1,7 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { PrismaClient } from "@prisma/client";
+import * as prismaClient from "@prisma/client";
+const PrismaClient = (prismaClient as any).PrismaClient;
 import { withAccelerate } from "@prisma/extension-accelerate";
 import "dotenv/config";
 import dns from "dns";
@@ -174,13 +175,13 @@ async function startServer() {
       }
 
       const [records, total] = await Promise.all([
-        prisma.intelRecord.findMany({
+        (prisma as any).intelRecord.findMany({
           where,
           orderBy: { createdAt: 'desc' },
           take: parseInt(limit as string),
           skip: parseInt(offset as string)
         }),
-        prisma.intelRecord.count({ where })
+        (prisma as any).intelRecord.count({ where })
       ]);
       
       res.json({
@@ -201,7 +202,7 @@ async function startServer() {
   app.get("/api/intel/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const record = await prisma.intelRecord.findUnique({
+      const record = await (prisma as any).intelRecord.findUnique({
         where: { id }
       });
       
