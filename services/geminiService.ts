@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, PersonaProfile, BehavioralForecast, Asset, MissionPlan, TargetDossier, Source, ForensicArtifact, AISettings } from '../types.js';
 import { addSystemLog, getSettings } from './storageService.js';
+import { authService } from './authService.js';
 
 // ================================================
 // IMPROVED CORE – DEEP RESEARCH EDITION (2026)
@@ -98,7 +99,7 @@ const callHuggingFace = async (prompt: string, systemInstruction: string, settin
         try {
             // Use backend proxy to avoid CORS and keep keys secure
             const response = await fetch('/api/ai/huggingface', {
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", ...authService.getAuthHeaders() },
                 method: "POST",
                 body: JSON.stringify({
                     endpoint,
@@ -153,6 +154,7 @@ export const callOpenAI = async (prompt: string, systemInstruction: string, sett
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...authService.getAuthHeaders()
             },
             body: JSON.stringify({
                 baseUrl,
@@ -202,7 +204,7 @@ const executeAI = async (params: {
     usePremiumTools?: boolean,
     temperature?: number
 }): Promise<AIResponse> => {
-    const settings = getSettings();
+    const settings = await getSettings();
     const apiKey = settings.apiKey || process.env.API_KEY || '';
     
     if (!apiKey) {
@@ -661,7 +663,7 @@ export const generateMissionPlan = async (targetName: string, details: string, o
 };
 
 export const synthesizeSpeech = async (text: string): Promise<string> => {
-    const settings = getSettings();
+    const settings = await getSettings();
     const apiKey = settings.apiKey || process.env.API_KEY || '';
     const genAI = new GoogleGenAI({ apiKey });
     
