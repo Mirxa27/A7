@@ -60,7 +60,8 @@ const validateUri = (uri: string): string => {
 };
 
 const callHuggingFace = async (prompt: string, systemInstruction: string, settings: AISettings): Promise<string> => {
-    const model = settings.hfModel || settings.model || 'meta-llama/Meta-Llama-3-8B-Instruct';
+    const model = settings.hfModel || settings.model;
+    if (!model) throw new Error("No Hugging Face model configured. Please select a model in Settings.");
     const endpoint = settings.hfEndpoint || `https://api-inference.huggingface.co/models/${model}`;
     const fullPrompt = `${systemInstruction}\n\nUser Request: ${prompt}`;
     
@@ -145,7 +146,8 @@ const callHuggingFace = async (prompt: string, systemInstruction: string, settin
 };
 
 export const callOpenAI = async (prompt: string, systemInstruction: string, settings: AISettings): Promise<string> => {
-    const model = settings.model || 'gpt-4o';
+    const model = settings.model;
+    if (!model) throw new Error("No OpenAI model configured. Please select a model in Settings.");
     const baseUrl = settings.baseUrl || 'https://api.openai.com/v1';
     
     try {
@@ -225,7 +227,8 @@ const executeAI = async (params: {
     // Default to Gemini
     try {
         const genAI = new GoogleGenAI({ apiKey });
-        const modelName = params.model || settings.model || "gemini-2.5-pro";
+        const modelName = params.model || settings.model;
+        if (!modelName) throw new Error("No AI model configured. Please select a model in Settings.");
         
         const config: any = {
             systemInstruction: systemPrompt,
@@ -357,22 +360,31 @@ export const executeIterativeResearch = async (goal: string, rounds = 3): Promis
 
 export const testAIConnection = async (testSettings: AISettings): Promise<boolean> => {
     try {
+        const apiKey = testSettings.apiKey || process.env.API_KEY || '';
+        if (!apiKey) return false;
+
         if (testSettings.provider === 'HUGGINGFACE') {
-            await callHuggingFace("ping", "You are a connectivity tester. Respond with 'pong'.", testSettings);
-            return true;
-        } else if (testSettings.provider === 'OPENAI') {
-            await callOpenAI("ping", "You are a connectivity tester. Respond with 'pong'.", testSettings);
-            return true;
-        } else {
-            const apiKey = testSettings.apiKey || process.env.API_KEY || '';
-            const genAI = new GoogleGenAI({ apiKey });
-            const modelName = testSettings.model || "gemini-2.5-pro";
-            await genAI.models.generateContent({
-                model: modelName,
-                contents: "ping",
-                config: { systemInstruction: "Respond with 'pong'." }
+            // Verify key by fetching HF whoami endpoint
+            const res = await fetch('https://huggingface.co/api/whoami-v2', {
+                headers: { Authorization: `Bearer ${apiKey}` }
             });
-            return true;
+            if (!res.ok) console.warn(`Hugging Face connection test failed: HTTP ${res.status}`);
+            return res.ok;
+        } else if (testSettings.provider === 'OPENAI') {
+            // Verify key by listing models (no model name needed)
+            const baseUrl = (testSettings.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+            const res = await fetch(`${baseUrl}/models`, {
+                headers: { Authorization: `Bearer ${apiKey}` }
+            });
+            if (!res.ok) console.warn(`OpenAI connection test failed: HTTP ${res.status}`);
+            return res.ok;
+        } else {
+            // Gemini: verify key by listing available models (no model name needed)
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1`
+            );
+            if (!res.ok) console.warn(`Gemini connection test failed: HTTP ${res.status}`);
+            return res.ok;
         }
     } catch (error) {
         console.error("AI Connection Test Failed:", error);

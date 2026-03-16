@@ -8,8 +8,8 @@ const TARGETS_KEY = 'agent7_targets';
 
 const DEFAULT_SETTINGS: AISettings = {
     provider: 'GEMINI',
-    model: 'gemini-2.5-pro',
-    hfModel: 'meta-llama/Meta-Llama-3-8B-Instruct',
+    model: '',
+    hfModel: '',
     apiKey: '',
     systemPrompt: 'You are AGENT-7, a high-level cyber intelligence AI. Your purpose is to assist in deep-cover operations, target reconnaissance, and tactical planning. You provide precise, factual data and never compromise operational security.',
     usePremiumTools: true,

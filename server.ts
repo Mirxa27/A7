@@ -217,6 +217,92 @@ async function startServer() {
     }
   });
 
+  // --- Model Discovery Routes ---
+
+  // Fetch available Gemini models for a given API key
+  app.post("/api/models/gemini", async (req, res) => {
+    const { apiKey } = req.body;
+    if (!apiKey) return res.status(400).json({ error: "apiKey is required" });
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=50`
+      );
+      const data: any = await response.json();
+      if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "Failed to fetch Gemini models" });
+      const models = (data.models || [])
+        .filter((m: any) =>
+          Array.isArray(m.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes("generateContent") &&
+          !m.name.includes("embedding") &&
+          !m.name.includes("aqa")
+        )
+        .map((m: any) => ({
+          id: m.name.replace("models/", ""),
+          name: m.displayName || m.name.replace("models/", ""),
+          desc: m.description?.split(".")[0] || ""
+        }));
+      res.json(models);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch Gemini models", details: error.message });
+    }
+  });
+
+  // Fetch available OpenAI (or compatible) models for a given API key
+  app.post("/api/models/openai", async (req, res) => {
+    const { apiKey, baseUrl } = req.body;
+    if (!apiKey) return res.status(400).json({ error: "apiKey is required" });
+    try {
+      const url = `${(baseUrl || "https://api.openai.com/v1").replace(/\/$/, "")}/models`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const data: any = await response.json();
+      if (!response.ok) return res.status(response.status).json({ error: data?.error?.message || "Failed to fetch OpenAI models" });
+      const models = (data.data || [])
+        .filter((m: any) => {
+          const id: string = m.id;
+          return id.includes("gpt") || id.includes("o1") || id.includes("o3") || id.startsWith("claude") || id.startsWith("gemini");
+        })
+        .sort((a: any, b: any) => (b.created || 0) - (a.created || 0))
+        .map((m: any) => ({
+          id: m.id,
+          name: m.id,
+          desc: m.created ? `Created ${new Date(m.created * 1000).toLocaleDateString()}` : ""
+        }));
+      // If no well-known models found (custom endpoint), return all
+      const result = models.length > 0 ? models : (data.data || []).map((m: any) => ({ id: m.id, name: m.id, desc: "" }));
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch OpenAI models", details: error.message });
+    }
+  });
+
+  // Fetch popular HuggingFace text-generation models (public, no key needed)
+  app.get("/api/models/huggingface", async (req, res) => {
+    try {
+      const response = await fetch(
+        "https://huggingface.co/api/models?filter=text-generation&inference=warm&sort=downloads&direction=-1&limit=30"
+      );
+      if (!response.ok) throw new Error("HuggingFace API error");
+      const data: any = await response.json();
+      const models = (data || []).slice(0, 25).map((m: any) => ({
+        id: m.id,
+        name: m.id.includes("/") ? m.id.split("/").pop() : m.id,
+        desc: m.downloads ? `${Math.round(m.downloads / 1000)}k downloads` : ""
+      }));
+      res.json(models);
+    } catch (error: any) {
+      // Fallback to a curated list if HF API is unavailable
+      res.json([
+        { id: "meta-llama/Llama-3.1-70B-Instruct", name: "Llama 3.1 70B", desc: "Meta – state-of-the-art reasoning" },
+        { id: "meta-llama/Meta-Llama-3-8B-Instruct", name: "Llama 3 8B", desc: "Meta – fast & efficient" },
+        { id: "mistralai/Mistral-7B-Instruct-v0.3", name: "Mistral 7B v0.3", desc: "Mistral AI – sharp instructions" },
+        { id: "Qwen/Qwen2.5-72B-Instruct", name: "Qwen 2.5 72B", desc: "Alibaba – multilingual performance" },
+        { id: "NousResearch/Hermes-3-Llama-3.1-8B", name: "Hermes 3 8B", desc: "Nous Research – high fidelity" }
+      ]);
+    }
+  });
+
   // Fallback for unknown API routes to prevent SPA fallback
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
