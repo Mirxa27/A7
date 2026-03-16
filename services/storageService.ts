@@ -1,167 +1,103 @@
 import { IntelRecord, Asset, MissionPlan, SystemLog, AISettings, Target } from '../types.js';
+import { authService } from './authService.js';
 
-const INTEL_KEY = 'agent7_intel_db';
-const ASSETS_KEY = 'agent7_assets';
-const LOGS_KEY = 'agent7_system_logs';
-const SETTINGS_KEY = 'agent7_ai_settings';
-const TARGETS_KEY = 'agent7_targets';
-
-const DEFAULT_SETTINGS: AISettings = {
-    provider: 'GEMINI',
-    model: 'gemini-3.1-pro-preview',
-    hfModel: 'meta-llama/Meta-Llama-3-8B-Instruct',
-    apiKey: '',
-    systemPrompt: 'You are AGENT-7, a high-level cyber intelligence AI. Your purpose is to assist in deep-cover operations, target reconnaissance, and tactical planning. You provide precise, factual data and never compromise operational security.',
-    usePremiumTools: true,
-    baseUrl: 'https://api.openai.com/v1'
-};
-
-const DEFAULT_INTEL: IntelRecord[] = [
-  { 
-    id: 'REC-001', 
-    title: 'Operation Blackbriar Summary', 
-    type: 'REPORT', 
-    date: '2023-10-12', 
-    clearance: 'TOP SECRET',
-    details: 'Surveillance indicates Subject 09 has moved assets to offshore accounts in Cayman Islands. Intercepted comms suggest a rendezvous in Berlin on 11/04. Recommended action: Deploy active tracking team.'
-  },
-  { 
-    id: 'REC-002', 
-    title: 'Target Alpha WhatsApp Intercept', 
-    type: 'INTERCEPT', 
-    date: '2023-11-05', 
-    clearance: 'SECRET',
-    details: '[14:02] T-Alpha: "The package is secure."\n[14:03] Handler: "Proceed to extraction point."\n[14:05] T-Alpha: "Negative, surveillance detected. Aborting."\nAnalysis: Target is aware of surveillance. Counter-measures active.'
+const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const headers = { ...authService.getAuthHeaders(), ...options.headers };
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401) {
+    // Session expired
+    await authService.logout();
+    window.location.reload();
+    throw new Error('Session expired');
   }
-];
-
-const DEFAULT_ASSETS: Asset[] = [
-    { id: 'ASSET-X12', type: 'IOT_SWARM', region: 'NA-EAST', status: 'ACTIVE', dataRate: 124 },
-    { id: 'ASSET-B99', type: 'GHOST_RELAY', region: 'EU-CENTRAL', status: 'EXFILTRATING', dataRate: 4050 },
-];
-
-// Helper to dispatch local storage events for cross-component updates
-const dispatchUpdate = (key: string) => {
-    window.dispatchEvent(new Event(`storage_${key}`));
+  if (!res.ok) throw new Error(`API Error: ${res.status}`);
+  return res;
 };
 
+// Intel Records
 export const getIntelRecords = async (): Promise<IntelRecord[]> => {
-    try {
-        const response = await fetch('/api/intel');
-        if (!response.ok) throw new Error('Failed to fetch intel records');
-        const data = await response.json();
-        return Array.isArray(data) ? data : (data.records ?? []);
-    } catch (e) {
-        console.error("API Error", e);
-        return DEFAULT_INTEL;
-    }
+  const res = await fetchWithAuth('/api/intel');
+  const data = await res.json();
+  return data.records || [];
 };
 
 export const saveIntelRecord = async (record: IntelRecord): Promise<IntelRecord[]> => {
-    try {
-        const response = await fetch('/api/intel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(record)
-        });
-        if (!response.ok) throw new Error('Failed to save intel record');
-        dispatchUpdate(INTEL_KEY);
-        return getIntelRecords();
-    } catch (e) {
-        console.error("API Error", e);
-        return getIntelRecords();
-    }
+  await fetchWithAuth('/api/intel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record)
+  });
+  return getIntelRecords();
 };
 
-export const getAssets = (): Asset[] => {
-    try {
-        const stored = localStorage.getItem(ASSETS_KEY);
-        if (!stored) {
-            localStorage.setItem(ASSETS_KEY, JSON.stringify(DEFAULT_ASSETS));
-            return DEFAULT_ASSETS;
-        }
-        return JSON.parse(stored);
-    } catch (e) {
-        console.error("Storage Error", e);
-        return DEFAULT_ASSETS;
-    }
+// Assets
+export const getAssets = async (): Promise<Asset[]> => {
+  const res = await fetchWithAuth('/api/assets');
+  return res.json();
 };
 
-export const saveAsset = (asset: Asset): Asset[] => {
-    const current = getAssets();
-    const updated = [...current, asset];
-    localStorage.setItem(ASSETS_KEY, JSON.stringify(updated));
-    dispatchUpdate(ASSETS_KEY);
-    return updated;
+export const saveAsset = async (asset: Asset): Promise<Asset[]> => {
+  await fetchWithAuth('/api/assets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(asset)
+  });
+  return getAssets();
 };
 
-export const saveMission = async (plan: MissionPlan): Promise<void> => {
-    const missionRecord: IntelRecord = {
-        id: `OP-${Math.floor(Math.random() * 9000) + 1000}`,
-        title: `OP: ${(plan.approach || 'DIRECT_ASSAULT').toUpperCase()} // ${plan.targetName}`,
-        type: 'MISSION',
-        date: new Date().toISOString().split('T')[0],
-        clearance: 'TOP SECRET',
-        details: `TARGET: ${plan.targetName}\nOBJECTIVE: ${plan.objective}\nRISK: ${plan.riskLevel}\nFEASIBILITY: ${plan.feasibility}%\nSTEPS:\n${plan.steps.join('\n')}`
-    };
-    await saveIntelRecord(missionRecord);
-    addSystemLog('USER_OPS', `Mission Plan '${plan.approach || 'DIRECT_ASSAULT'}' archived for target ${plan.targetName}`, 'SUCCESS');
+// Targets
+export const getTargets = async (): Promise<Target[]> => {
+  const res = await fetchWithAuth('/api/targets');
+  return res.json();
+};
+
+export const saveTarget = async (target: Target): Promise<Target[]> => {
+  await fetchWithAuth('/api/targets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(target)
+  });
+  return getTargets();
 };
 
 // System Logs
-export const getSystemLogs = (): SystemLog[] => {
-    try {
-        const stored = localStorage.getItem(LOGS_KEY);
-        return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
+export const getSystemLogs = async (): Promise<SystemLog[]> => {
+  const res = await fetchWithAuth('/api/logs');
+  return res.json();
 };
 
-export const addSystemLog = (source: SystemLog['source'], message: string, status: SystemLog['status'] = 'INFO') => {
-    const logs = getSystemLogs();
-    const newLog: SystemLog = {
-        id: Math.random().toString(36).substring(2, 11),
-        timestamp: new Date().toISOString(),
-        source,
-        message,
-        status
-    };
-    const updatedLogs = [newLog, ...logs].slice(0, 100); // Keep last 100
-    localStorage.setItem(LOGS_KEY, JSON.stringify(updatedLogs));
-    dispatchUpdate(LOGS_KEY);
+export const addSystemLog = async (source: SystemLog['source'], message: string, status: SystemLog['status'] = 'INFO'): Promise<void> => {
+  await fetchWithAuth('/api/logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source, message, status })
+  });
 };
 
-export const getSettings = (): AISettings => {
-    try {
-        const stored = localStorage.getItem(SETTINGS_KEY);
-        return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
-    } catch {
-        return DEFAULT_SETTINGS;
-    }
+// Settings
+export const getSettings = async (): Promise<AISettings> => {
+  const res = await fetchWithAuth('/api/settings');
+  return res.json();
 };
 
-export const saveSettings = (settings: AISettings) => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    dispatchUpdate(SETTINGS_KEY);
+export const saveSettings = async (settings: AISettings): Promise<void> => {
+  await fetchWithAuth('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  });
 };
 
-export const getTargets = (): Target[] => {
-    try {
-        const stored = localStorage.getItem(TARGETS_KEY);
-        return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-};
-
-export const saveTarget = (target: Target): Target[] => {
-    const current = getTargets();
-    const index = current.findIndex(t => t.id === target.id || t.name === target.name);
-    let updated;
-    if (index >= 0) {
-        updated = [...current];
-        updated[index] = { ...updated[index], ...target };
-    } else {
-        updated = [target, ...current];
-    }
-    localStorage.setItem(TARGETS_KEY, JSON.stringify(updated));
-    dispatchUpdate(TARGETS_KEY);
-    return updated;
+// Mission
+export const saveMission = async (plan: MissionPlan): Promise<void> => {
+  const missionRecord: IntelRecord = {
+    id: `OP-${Math.floor(Math.random() * 9000) + 1000}`,
+    title: `OP: ${(plan.approach || 'DIRECT_ASSAULT').toUpperCase()} // ${plan.targetName}`,
+    type: 'MISSION',
+    date: new Date().toISOString().split('T')[0],
+    clearance: 'TOP SECRET',
+    details: `TARGET: ${plan.targetName}\nOBJECTIVE: ${plan.objective}\nRISK: ${plan.riskLevel}\nFEASIBILITY: ${plan.feasibility}%\nSTEPS:\n${plan.steps.join('\n')}`
+  };
+  await saveIntelRecord(missionRecord);
+  await addSystemLog('USER_OPS', `Mission Plan '${plan.approach || 'DIRECT_ASSAULT'}' archived for target ${plan.targetName}`, 'SUCCESS');
 };

@@ -1,6 +1,7 @@
 import winston from 'winston';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,6 +27,9 @@ const fileFormat = winston.format.combine(
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 // Logger configuration
 export const logger = winston.createLogger({

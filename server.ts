@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
-import { supabase } from "./lib/supabase.js";
+import { prisma } from "./lib/prisma.js";
 import "dotenv/config";
 import dns from "dns";
 import { promisify } from "util";
@@ -74,7 +74,12 @@ async function startServer() {
 
   app.get("/api/status", async (req, res) => {
     try {
-      const { error: dbError } = await supabase.from('intel_records').select('count').limit(1);
+      let dbError = null;
+      try {
+        await prisma.intelRecord.count();
+      } catch (e) {
+        dbError = e;
+      }
       const cacheStats = CacheService.getStats();
 
       res.json({
@@ -125,30 +130,28 @@ async function startServer() {
   app.get("/api/intel", async (req, res) => {
     try {
       const { type, clearance, limit = '100', search, offset = '0' } = req.query;
+      const take = parseInt(limit as string);
+      const skip = parseInt(offset as string);
 
-      let query = supabase.from('intel_records').select('*', { count: 'exact' });
-
-      if (type) query = query.eq('type', type);
-      if (clearance) query = query.eq('clearance', clearance);
+      const where: any = {};
+      if (type) where.type = type as string;
+      if (clearance) where.clearance = clearance as string;
       if (search) {
-        query = query.or(`title.ilike.%${search}%,details.ilike.%${search}%,source.ilike.%${search}%`);
+        where.OR = [
+          { title: { contains: search as string, mode: 'insensitive' } },
+          { details: { contains: search as string, mode: 'insensitive' } },
+          { source: { contains: search as string, mode: 'insensitive' } },
+        ];
       }
 
-      query = query
-        .order('created_at', { ascending: false })
-        .range(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string) - 1);
-
-      const { data: records, count, error } = await query;
-      if (error) throw error;
+      const [records, total] = await Promise.all([
+        prisma.intelRecord.findMany({ where, orderBy: { createdAt: 'desc' }, take, skip }),
+        prisma.intelRecord.count({ where }),
+      ]);
 
       res.json({
-        records: records || [],
-        pagination: {
-          total: count || 0,
-          limit: parseInt(limit as string),
-          offset: parseInt(offset as string),
-          hasMore: (count || 0) > (parseInt(offset as string) + parseInt(limit as string))
-        }
+        records,
+        pagination: { total, limit: take, offset: skip, hasMore: total > skip + take },
       });
     } catch (error) {
       logger.error('Error fetching intel records', { error });
@@ -159,13 +162,7 @@ async function startServer() {
   app.get("/api/intel/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { data: record, error } = await supabase
-        .from('intel_records')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (error) throw error;
+      const record = await prisma.intelRecord.findUnique({ where: { id } });
       if (!record) {
         return res.status(404).json({ error: "Intel record not found" });
       }
@@ -181,23 +178,12 @@ async function startServer() {
     try {
       const { title, type, date, clearance, details, tags, source } = req.body;
 
-      const { data: record, error } = await supabase
-        .from('intel_records')
-        .insert({
-          title,
-          type,
-          date,
-          clearance,
-          details: details || null,
-          tags: tags || [],
-          source: source || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
+      const record = await prisma.intelRecord.create({
+        data: { title, type, date, clearance, details: details || null, tags: tags || [], source: source || null }
+      });
 
       logger.info('Intel record created', { id: record.id, title, type });
+      broadcastEvent('intel:update', record);
       res.status(201).json(record);
     } catch (error) {
       logger.error('Error creating intel record', { error });
@@ -219,16 +205,10 @@ async function startServer() {
       if (tags) updateData.tags = tags;
       if (source !== undefined) updateData.source = source;
 
-      const { data: record, error } = await supabase
-        .from('intel_records')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      const record = await prisma.intelRecord.update({ where: { id }, data: updateData });
 
       logger.info('Intel record updated', { id });
+      broadcastEvent('intel:update', record);
       res.json(record);
     } catch (error) {
       logger.error('Error updating intel record', { error, id: req.params.id });
@@ -239,12 +219,7 @@ async function startServer() {
   app.delete("/api/intel/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { error } = await supabase
-        .from('intel_records')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await prisma.intelRecord.delete({ where: { id } });
 
       logger.info('Intel record deleted', { id });
       res.json({ success: true, message: "Intel record deleted" });
@@ -255,6 +230,219 @@ async function startServer() {
   });
 
   // ============================================
+
+  // ============================================
+  // ASSETS API
+  // ============================================
+
+  app.get("/api/assets", async (req, res) => {
+    try {
+      const assets = await prisma.asset.findMany({ orderBy: { createdAt: 'desc' } });
+      res.json(assets);
+    } catch (error) {
+      logger.error('Error fetching assets', { error });
+      res.status(500).json({ error: "Failed to fetch assets" });
+    }
+  });
+
+  app.post("/api/assets", async (req, res) => {
+    try {
+      const { type, region, status, dataRate } = req.body;
+      const asset = await prisma.asset.create({
+        data: { type, region, status: status || 'ACTIVE', dataRate: dataRate || 0 }
+      });
+      logger.info('Asset created', { id: asset.id, type });
+      res.status(201).json(asset);
+    } catch (error) {
+      logger.error('Error creating asset', { error });
+      res.status(500).json({ error: "Failed to create asset" });
+    }
+  });
+
+  app.patch("/api/assets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const asset = await prisma.asset.update({ where: { id }, data: req.body });
+      logger.info('Asset updated', { id });
+      broadcastEvent('asset:update', asset);
+      res.json(asset);
+    } catch (error) {
+      logger.error('Error updating asset', { error, id: req.params.id });
+      res.status(500).json({ error: "Failed to update asset" });
+    }
+  });
+
+  app.delete("/api/assets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await prisma.asset.delete({ where: { id } });
+      logger.info('Asset deleted', { id });
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Error deleting asset', { error, id: req.params.id });
+      res.status(500).json({ error: "Failed to delete asset" });
+    }
+  });
+
+  // ============================================
+  // TARGETS API
+  // ============================================
+
+  app.get("/api/targets", async (req, res) => {
+    try {
+      const targets = await prisma.target.findMany({ orderBy: { createdAt: 'desc' } });
+      res.json(targets);
+    } catch (error) {
+      logger.error('Error fetching targets', { error });
+      res.status(500).json({ error: "Failed to fetch targets" });
+    }
+  });
+
+  app.post("/api/targets", async (req, res) => {
+    try {
+      const { name, status, lastSeen, location, activityLevel, metadata } = req.body;
+      const target = await prisma.target.create({
+        data: {
+          name,
+          status: status || 'TRACKING',
+          lastSeen: lastSeen || new Date().toISOString(),
+          location,
+          activityLevel: activityLevel || 0,
+          metadata
+        }
+      });
+      logger.info('Target created', { id: target.id, name });
+      res.status(201).json(target);
+    } catch (error) {
+      logger.error('Error creating target', { error });
+      res.status(500).json({ error: "Failed to create target" });
+    }
+  });
+
+  app.patch("/api/targets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const target = await prisma.target.update({ where: { id }, data: req.body });
+      logger.info('Target updated', { id });
+      res.json(target);
+    } catch (error) {
+      logger.error('Error updating target', { error, id: req.params.id });
+      res.status(500).json({ error: "Failed to update target" });
+    }
+  });
+
+  app.delete("/api/targets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await prisma.target.delete({ where: { id } });
+      logger.info('Target deleted', { id });
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Error deleting target', { error, id: req.params.id });
+      res.status(500).json({ error: "Failed to delete target" });
+    }
+  });
+
+  // ============================================
+  // SYSTEM LOGS API
+  // ============================================
+
+  app.get("/api/logs", async (req, res) => {
+    try {
+      const { source, status, limit = '200' } = req.query;
+      const where: any = {};
+      if (source) where.source = source as string;
+      if (status) where.status = status as string;
+      const logs = await prisma.systemLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit as string)
+      });
+      res.json(logs);
+    } catch (error) {
+      logger.error('Error fetching logs', { error });
+      res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  app.post("/api/logs", async (req, res) => {
+    try {
+      const { source, message, status } = req.body;
+      const log = await prisma.systemLog.create({
+        data: { source: source || 'SYSTEM', message, status: status || 'INFO' }
+      });
+      broadcastEvent('log', log);
+      res.status(201).json(log);
+    } catch (error) {
+      logger.error('Error creating log', { error });
+      res.status(500).json({ error: "Failed to create log" });
+    }
+  });
+
+  app.delete("/api/logs/clear", async (req, res) => {
+    try {
+      const keepCount = 500;
+      const logs = await prisma.systemLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: keepCount,
+        select: { id: true }
+      });
+      const keepIds = logs.map(l => l.id);
+      const deleted = await prisma.systemLog.deleteMany({
+        where: { id: { notIn: keepIds } }
+      });
+      logger.info('Old logs cleared', { deleted: deleted.count });
+      res.json({ success: true, deleted: deleted.count });
+    } catch (error) {
+      logger.error('Error clearing logs', { error });
+      res.status(500).json({ error: "Failed to clear logs" });
+    }
+  });
+
+  // ============================================
+  // SETTINGS API
+  // ============================================
+
+  app.get("/api/settings", async (req, res) => {
+    try {
+      let settings = await prisma.appSettings.findUnique({ where: { id: 'default' } });
+      if (!settings) {
+        settings = await prisma.appSettings.create({
+          data: {
+            id: 'default',
+            provider: 'GEMINI',
+            model: 'gemini-2.0-flash',
+            systemPrompt: 'You are AGENT-7, a high-level cyber intelligence AI.',
+            usePremiumTools: true,
+            baseUrl: 'https://api.openai.com/v1'
+          }
+        });
+      }
+      res.json(settings);
+    } catch (error) {
+      logger.error('Error fetching settings', { error });
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.put("/api/settings", async (req, res) => {
+    try {
+      const data = req.body;
+      delete data.id;
+      const settings = await prisma.appSettings.upsert({
+        where: { id: 'default' },
+        update: data,
+        create: { id: 'default', ...data }
+      });
+      logger.info('Settings updated');
+      res.json(settings);
+    } catch (error) {
+      logger.error('Error updating settings', { error });
+      res.status(500).json({ error: "Failed to update settings" });
+    }
+  });
+
+
   // OSINT ENDPOINTS
   // ============================================
 
@@ -596,26 +784,34 @@ async function startServer() {
   // JOB QUEUE API
   // ============================================
 
-  app.post("/api/jobs", (req, res) => {
-    const { type, data } = req.body;
+  app.post("/api/jobs", async (req, res) => {
+    try {
+      const { type, data } = req.body;
 
-    if (!type || !data) {
-      return res.status(400).json({ error: "Missing type or data" });
+      if (!type || !data) {
+        return res.status(400).json({ error: "Missing type or data" });
+      }
+
+      const job = await prisma.job.create({ data: { type, data, status: 'pending' } });
+      jobQueue.addJob(job.id, type, data);
+      broadcastEvent('job:update', job);
+      logger.info('Job created', { jobId: job.id, type });
+
+      res.status(201).json(job);
+    } catch (error) {
+      logger.error('Error creating job', { error });
+      res.status(500).json({ error: "Failed to create job" });
     }
-
-    const jobId = jobQueue.addJob(type, data);
-    logger.info('Job created', { jobId, type });
-
-    res.status(201).json({
-      jobId,
-      status: 'pending',
-      message: 'Job queued successfully'
-    });
   });
 
-  app.get("/api/jobs", (req, res) => {
-    const jobs = jobQueue.getAllJobs();
-    res.json(jobs);
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const jobs = await prisma.job.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+      res.json(jobs);
+    } catch (error) {
+      logger.error('Error fetching jobs', { error });
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
   });
 
   app.get("/api/jobs/active", (req, res) => {
@@ -623,15 +819,20 @@ async function startServer() {
     res.json(jobs);
   });
 
-  app.get("/api/jobs/:id", (req, res) => {
-    const { id } = req.params;
-    const job = jobQueue.getJob(id);
+  app.get("/api/jobs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const job = await prisma.job.findUnique({ where: { id } });
 
-    if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      res.json(job);
+    } catch (error) {
+      logger.error('Error fetching job', { error, id: req.params.id });
+      res.status(500).json({ error: "Failed to fetch job" });
     }
-
-    res.json(job);
   });
 
   app.delete("/api/jobs/:id", (req, res) => {
@@ -742,12 +943,30 @@ async function startServer() {
       available: [
         'GET /api/health',
         'GET /api/status',
+        'POST /api/auth/login',
+        'POST /api/auth/logout',
+        'GET /api/auth/verify',
+        'GET /api/events',
+        'GET /api/metrics',
         'GET /api/admin/cache/stats',
         'POST /api/admin/cache/clear/:type',
         'GET/POST /api/intel',
         'GET /api/intel/:id',
         'PATCH /api/intel/:id',
         'DELETE /api/intel/:id',
+        'GET /api/assets',
+        'POST /api/assets',
+        'PATCH /api/assets/:id',
+        'DELETE /api/assets/:id',
+        'GET /api/targets',
+        'POST /api/targets',
+        'PATCH /api/targets/:id',
+        'DELETE /api/targets/:id',
+        'GET /api/logs',
+        'POST /api/logs',
+        'DELETE /api/logs/clear',
+        'GET /api/settings',
+        'PUT /api/settings',
         'GET /api/osint/dns/:domain',
         'GET /api/osint/subdomains/:domain',
         'GET /api/osint/ssl/:domain',
@@ -803,7 +1022,7 @@ async function startServer() {
     logger.info(`Agent7 Intelligence Interface started`, {
       port: PORT,
       environment: process.env.NODE_ENV || 'development',
-      database: 'Supabase'
+      database: 'Prisma Accelerate'
     });
     console.log(`Server running at http://localhost:${PORT}`);
   });

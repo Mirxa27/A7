@@ -17,17 +17,32 @@ import { ThreatMonitor } from './components/ThreatMonitor';
 import { ViewState } from './types';
 import { OperationsProvider } from './context/OperationsContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { authService } from './services/authService';
+import { eventService } from './services/eventService';
 
 function App() {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
   const [mounted, setMounted] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    // Check existing session
+    authService.verify().then(valid => {
+      setAuthenticated(valid);
+      setAuthChecked(true);
+    });
   }, []);
 
-  if (!mounted) return null;
+  useEffect(() => {
+    if (authenticated) {
+      eventService.connect();
+      return () => eventService.disconnect();
+    }
+  }, [authenticated]);
+
+  if (!mounted || !authChecked) return null;
 
   if (!authenticated) {
     return <Login onLogin={() => setAuthenticated(true)} />;

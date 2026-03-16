@@ -1,5 +1,13 @@
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
+import { prisma } from './prisma.js';
+import {
+  searchUsernameEnhanced,
+  enumerateSubdomains,
+  getSSLInfo,
+  geolocateIP,
+  checkEmailBreaches
+} from './osintEnhanced.js';
 
 interface Job {
   id: string;
@@ -14,8 +22,21 @@ interface Job {
   completedAt?: Date;
 }
 
+interface InMemoryJob {
+  id: string;
+  type: string;
+  data: any;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  result?: any;
+  error?: string;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
 class JobQueue extends EventEmitter {
-  private jobs: Map<string, Job> = new Map();
+  private jobs: Map<string, InMemoryJob> = new Map();
   private queue: string[] = [];
   private running: boolean = false;
   private maxConcurrent: number = 3;
@@ -27,9 +48,9 @@ class JobQueue extends EventEmitter {
   }
 
   // Add a job to the queue
-  addJob(type: string, data: any): string {
-    const id = uuidv4();
-    const job: Job = {
+  addJob(id: string, type: string, data: any): string {
+    // id may come from Prisma-created job
+    const job: InMemoryJob = {
       id,
       type,
       data,
@@ -41,10 +62,10 @@ class JobQueue extends EventEmitter {
     this.jobs.set(id, job);
     this.queue.push(id);
     this.emit('job:added', job);
-    
+
     // Start processing if not already running
     this.processQueue();
-    
+
     return id;
   }
 
@@ -55,7 +76,7 @@ class JobQueue extends EventEmitter {
 
   // Get all jobs
   getAllJobs(): Job[] {
-    return Array.from(this.jobs.values()).sort((a, b) => 
+    return Array.from(this.jobs.values()).sort((a, b) =>
       b.createdAt.getTime() - a.createdAt.getTime()
     );
   }
@@ -146,68 +167,101 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  // Example: Execute dossier generation job
+  // Execute dossier generation job with real OSINT lookups
   private async executeDossierJob(job: Job): Promise<void> {
     const { target, resources } = job.data;
-    
     try {
-      // Simulate progressive updates
+      await prisma.job.update({
+        where: { id: job.id },
+        data: { status: 'running', startedAt: new Date() }
+      });
       this.updateProgress(job.id, 10);
-      await this.delay(1000);
-      
-      this.updateProgress(job.id, 30);
-      await this.delay(1000);
-      
-      this.updateProgress(job.id, 60);
-      await this.delay(1000);
-      
+
+      // Real OSINT execution
+      const results: any = { target, timestamp: new Date().toISOString() };
+
+      // DNS + WHOIS for domains
+      const isDomain = /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}$/i.test(target);
+      if (isDomain) {
+        this.updateProgress(job.id, 30);
+        results.subdomains = await enumerateSubdomains(target);
+        this.updateProgress(job.id, 50);
+        results.ssl = await getSSLInfo(target);
+        this.updateProgress(job.id, 70);
+      } else {
+        // Assume username
+        this.updateProgress(job.id, 30);
+        results.username = await searchUsernameEnhanced(target);
+        this.updateProgress(job.id, 70);
+      }
+
       this.updateProgress(job.id, 90);
-      
-      // Mock result - in real implementation, call actual services
-      const result = {
-        target,
-        resources,
-        timestamp: new Date().toISOString(),
-        status: 'completed',
-        message: 'Dossier generation completed'
-      };
-      
-      this.completeJob(job.id, result);
+      await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          status: 'completed',
+          progress: 100,
+          result: results,
+          completedAt: new Date()
+        }
+      });
+      this.completeJob(job.id, results);
     } catch (error: any) {
+      await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          error: error.message,
+          completedAt: new Date()
+        }
+      });
       this.failJob(job.id, error.message);
     }
   }
 
-  // Example: Execute security scan job
+  // Execute security scan job with real DNS/subdomain/SSL scans
   private async executeScanJob(job: Job): Promise<void> {
     const { target, scanType } = job.data;
-    
     try {
+      await prisma.job.update({
+        where: { id: job.id },
+        data: { status: 'running', startedAt: new Date() }
+      });
+      const results: any = { target, scanType, timestamp: new Date().toISOString(), findings: [] };
+
       this.updateProgress(job.id, 20);
-      await this.delay(500);
-      
+      if (scanType === 'subdomain' || scanType === 'full') {
+        const subdomains = await enumerateSubdomains(target);
+        results.findings.push({ type: 'subdomains', data: subdomains });
+      }
       this.updateProgress(job.id, 50);
-      await this.delay(500);
-      
+      if (scanType === 'ssl' || scanType === 'full') {
+        const ssl = await getSSLInfo(target);
+        results.findings.push({ type: 'ssl', data: ssl });
+      }
       this.updateProgress(job.id, 80);
-      
-      const result = {
-        target,
-        scanType,
-        timestamp: new Date().toISOString(),
-        findings: [],
-        status: 'completed'
-      };
-      
-      this.completeJob(job.id, result);
+
+      await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          status: 'completed',
+          progress: 100,
+          result: results,
+          completedAt: new Date()
+        }
+      });
+      this.completeJob(job.id, results);
     } catch (error: any) {
+      await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          error: error.message,
+          completedAt: new Date()
+        }
+      });
       this.failJob(job.id, error.message);
     }
-  }
-
-  // Utility: Delay
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // Cancel a job
@@ -230,15 +284,15 @@ class JobQueue extends EventEmitter {
   clearOldJobs(hours: number = 24): number {
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     let cleared = 0;
-    
+
     for (const [id, job] of this.jobs.entries()) {
-      if ((job.status === 'completed' || job.status === 'failed') && 
+      if ((job.status === 'completed' || job.status === 'failed') &&
           job.completedAt && job.completedAt < cutoff) {
         this.jobs.delete(id);
         cleared++;
       }
     }
-    
+
     return cleared;
   }
 }

@@ -79,9 +79,9 @@ export const Dashboard: React.FC = () => {
 
   // Update Stats from Storage
   const updateStats = async () => {
-    const assets = getAssets();
+    const assets = await getAssets();
     const intel = await getIntelRecords();
-    const logs = getSystemLogs();
+    const logs = await getSystemLogs();
 
     // Re-check AI status periodically
     checkAIStatus();
