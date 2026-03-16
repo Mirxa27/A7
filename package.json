@@ -15,13 +15,13 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "export:cleanup": "node -e \"import('./lib/exportService.js').then(m => m.exportService.cleanupOldExports(1))\"",
-    "test": "echo 'Tests not configured'"
+    "test": "echo 'Tests not configured'",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@google/genai": "^1.39.0",
     "@prisma/client": "^7.4.2",
     "@prisma/extension-accelerate": "^3.0.1",
-    "@supabase/supabase-js": "^2.99.1",
     "@types/node": "^22.14.0",
     "@types/pdfkit": "^0.13.9",
     "@types/uuid": "^10.0.0",

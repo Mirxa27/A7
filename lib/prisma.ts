@@ -1,12 +1,14 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
 
-const globalForPrisma = globalThis as unknown as { prisma: ReturnType<typeof createPrismaClient> };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
 function createPrismaClient() {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  }).$extends(withAccelerate());
+    // @ts-ignore - accelerateUrl is required for Accelerate connections
+    accelerateUrl: process.env.DATABASE_URL
+  });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
