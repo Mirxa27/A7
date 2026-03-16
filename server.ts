@@ -183,6 +183,7 @@ async function startServer() {
       });
 
       logger.info('Intel record created', { id: record.id, title, type });
+      broadcastEvent('intel:update', record);
       res.status(201).json(record);
     } catch (error) {
       logger.error('Error creating intel record', { error });
@@ -207,6 +208,7 @@ async function startServer() {
       const record = await prisma.intelRecord.update({ where: { id }, data: updateData });
 
       logger.info('Intel record updated', { id });
+      broadcastEvent('intel:update', record);
       res.json(record);
     } catch (error) {
       logger.error('Error updating intel record', { error, id: req.params.id });
@@ -262,6 +264,7 @@ async function startServer() {
       const { id } = req.params;
       const asset = await prisma.asset.update({ where: { id }, data: req.body });
       logger.info('Asset updated', { id });
+      broadcastEvent('asset:update', asset);
       res.json(asset);
     } catch (error) {
       logger.error('Error updating asset', { error, id: req.params.id });
@@ -368,6 +371,7 @@ async function startServer() {
       const log = await prisma.systemLog.create({
         data: { source: source || 'SYSTEM', message, status: status || 'INFO' }
       });
+      broadcastEvent('log', log);
       res.status(201).json(log);
     } catch (error) {
       logger.error('Error creating log', { error });
@@ -789,7 +793,8 @@ async function startServer() {
       }
 
       const job = await prisma.job.create({ data: { type, data, status: 'pending' } });
-      jobQueue.addJob(type, data); // Job ID: job.id
+      jobQueue.addJob(job.id, type, data);
+      broadcastEvent('job:update', job);
       logger.info('Job created', { jobId: job.id, type });
 
       res.status(201).json(job);
@@ -938,6 +943,11 @@ async function startServer() {
       available: [
         'GET /api/health',
         'GET /api/status',
+        'POST /api/auth/login',
+        'POST /api/auth/logout',
+        'GET /api/auth/verify',
+        'GET /api/events',
+        'GET /api/metrics',
         'GET /api/admin/cache/stats',
         'POST /api/admin/cache/clear/:type',
         'GET/POST /api/intel',
