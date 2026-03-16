@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Wifi, Eye, Lock, Globe, Server, User, MapPin, Activity, ShieldAlert } from 'lucide-react';
 import { Asset, Target } from '../types';
 import { getAssets, saveAsset, getTargets } from '../services/storageService';
+import { eventService } from '../services/eventService';
 import { generateTacticalAsset } from '../services/geminiService';
 
 export const SurveillanceGrid: React.FC = () => {
@@ -10,12 +11,12 @@ export const SurveillanceGrid: React.FC = () => {
   const [isDeploying, setIsDeploying] = useState(false);
 
   useEffect(() => {
-    setAssets(getAssets());
-    setTargets(getTargets());
+    getAssets().then(setAssets).catch(() => {});
+    getTargets().then(setTargets).catch(() => {});
     
     const handleUpdate = () => {
-        setAssets(getAssets());
-        setTargets(getTargets());
+        getAssets().then(setAssets).catch(() => {});
+        getTargets().then(setTargets).catch(() => {});
     };
     window.addEventListener('storage_agent7_assets', handleUpdate);
     window.addEventListener('storage_agent7_targets', handleUpdate);

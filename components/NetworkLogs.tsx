@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SystemLog } from '../types';
 import { getSystemLogs } from '../services/storageService';
+import { eventService } from '../services/eventService';
 import { Terminal, Activity, Server, AlertCircle } from 'lucide-react';
 
 export const NetworkLogs: React.FC = () => {
@@ -9,11 +10,15 @@ export const NetworkLogs: React.FC = () => {
 
   useEffect(() => {
     // Initial Load
-    setLogs(getSystemLogs());
+    getSystemLogs().then(setLogs).catch(() => {});
+
+    const handleNewLog = (log: any) => setLogs((prev: any) => [log, ...prev].slice(0, 200));
+    eventService.on('log', handleNewLog);
+    return () => eventService.off('log', handleNewLog);
 
     // Listen for real-time updates from storageService
     const handleUpdate = () => {
-        setLogs(getSystemLogs());
+        getSystemLogs().then(setLogs).catch(() => {});
     };
 
     window.addEventListener('storage_agent7_system_logs', handleUpdate);

@@ -7,7 +7,12 @@ import { useNotification } from '../context/NotificationContext';
 import { testAIConnection } from '../services/geminiService';
 
 export const Settings: React.FC = () => {
-  const [settings, setSettings] = useState<AISettings>(getSettings());
+  const [settings, setSettings] = useState<AISettings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSettings().then(s => { setSettings(s); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<'IDLE' | 'SUCCESS' | 'FAILED'>('IDLE');
@@ -39,13 +44,13 @@ export const Settings: React.FC = () => {
     const success = await testAIConnection(settings);
     
     if (success) {
-      saveSettings(settings);
+      await saveSettings(settings);
       setTestStatus('SUCCESS');
-      addSystemLog('SYSTEM', 'AI Configuration verified and synchronized.', 'SUCCESS');
+      addSystemLog('SYSTEM', 'AI Configuration verified and synchronized.', 'SUCCESS').catch(() => {});
       notify('AI Configuration updated successfully', 'success');
     } else {
       setTestStatus('FAILED');
-      addSystemLog('SYSTEM', 'AI Configuration failed verification. Save aborted.', 'ERROR');
+      addSystemLog('SYSTEM', 'AI Configuration failed verification. Save aborted.', 'ERROR').catch(() => {});
       notify('AI Configuration failed. Check your credentials.', 'error');
     }
     setIsSaving(false);
@@ -54,20 +59,20 @@ export const Settings: React.FC = () => {
   const handleTestConnection = async (currentSettings: AISettings = settings) => {
     setIsTesting(true);
     setTestStatus('IDLE');
-    addSystemLog('SYSTEM', `Initiating connection test for ${currentSettings.provider}...`, 'INFO');
+    addSystemLog('SYSTEM', `Initiating connection test for ${currentSettings.provider}...`, 'INFO').catch(() => {});
     
     const success = await testAIConnection(currentSettings);
     
     setIsTesting(false);
     if (success) {
       setTestStatus('SUCCESS');
-      saveSettings(currentSettings); // Auto-sync on success
+      await saveSettings(currentSettings); // Auto-sync on success
       notify('AI Connection established and synchronized', 'success');
-      addSystemLog('SYSTEM', 'AI Neural link verified and stable. System synchronized.', 'SUCCESS');
+      addSystemLog('SYSTEM', 'AI Neural link verified and stable. System synchronized.', 'SUCCESS').catch(() => {});
     } else {
       setTestStatus('FAILED');
       notify('AI Connection failed. Check your API key and model identifier.', 'error');
-      addSystemLog('SYSTEM', 'AI Neural link failed to initialize.', 'ERROR');
+      addSystemLog('SYSTEM', 'AI Neural link failed to initialize.', 'ERROR').catch(() => {});
     }
   };
 
