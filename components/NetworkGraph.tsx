@@ -7,7 +7,7 @@ export const NetworkGraph: React.FC = () => {
   const [data, setData] = useState<RadarMetric[]>([]);
 
   const calculateMetrics = async (): Promise<RadarMetric[]> => {
-    const assets = getAssets();
+    const [assets, setAssets] = useState([]); useEffect(() => { getAssets().then(setAssets).catch(() => {}); }, []);
     const intel = await getIntelRecords();
 
     // 1. Coverage: Based on unique regions occupied

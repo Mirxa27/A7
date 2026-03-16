@@ -12,8 +12,8 @@ export const SocialEngineering: React.FC = () => {
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
 
   useEffect(() => {
-    setTargets(getTargets());
-    const handleUpdate = () => setTargets(getTargets());
+    getTargets().then(setTargets).catch(() => {});
+    const handleUpdate = () => getTargets().then(setTargets).catch(() => {});
     window.addEventListener('storage_agent7_targets', handleUpdate);
     return () => window.removeEventListener('storage_agent7_targets', handleUpdate);
   }, []);
@@ -109,7 +109,7 @@ export const SocialEngineering: React.FC = () => {
                                 const found = result.filter((r: any) => r.available === false);
                                 // Update the target in storage (this is a bit complex since we need to update the global state)
                                 // For now, let's just show a toast or log it.
-                                addSystemLog('USER_OPS', `Real-time social scan for ${selectedTarget.name} found ${found.length} profiles.`, 'SUCCESS');
+                                addSystemLog('USER_OPS', `Real-time social scan for ${selectedTarget.name} found ${found.length} profiles.`, 'SUCCESS').catch(() => {});
                             }}
                             className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
                         >

@@ -285,7 +285,7 @@ export const executeIterativeResearch = async (goal: string, rounds = 3): Promis
     const allSources: Source[] = [];
     let currentFactBase = "";
 
-    addSystemLog('AI_CORE', `Starting deep research pipeline: ${goal}`, 'INFO');
+    addSystemLog('AI_CORE', `Starting deep research pipeline: ${goal}`, 'INFO').catch(() => {});
     researchLog.push(`[INIT] Deep Research Objective: ${goal}`);
 
     for (let i = 1; i <= rounds; i++) {
@@ -349,7 +349,7 @@ export const executeIterativeResearch = async (goal: string, rounds = 3): Promis
         temperature: 0.0
     });
 
-    addSystemLog('AI_CORE', `Deep research complete for: ${goal}`, 'SUCCESS');
+    addSystemLog('AI_CORE', `Deep research complete for: ${goal}`, 'SUCCESS').catch(() => {});
     return {
         report: finalRes.text,
         sources: allSources,
@@ -383,7 +383,7 @@ export const testAIConnection = async (testSettings: AISettings): Promise<boolea
 };
 
 export const analyzeIntel = async (text: string, realOsintContext?: any): Promise<AnalysisResult> => {
-    addSystemLog('AI_CORE', 'Processing raw intel stream for analysis...', 'INFO');
+    addSystemLog('AI_CORE', 'Processing raw intel stream for analysis...', 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `TASK: Perform deep-dive tactical analysis on the provided raw intelligence.
@@ -416,13 +416,13 @@ DIRECTIVES:
         });
 
         const jsonRes = JSON.parse(cleanJson(aiRes.text));
-        addSystemLog('AI_CORE', 'Intel analysis complete.', 'SUCCESS');
+        addSystemLog('AI_CORE', 'Intel analysis complete.', 'SUCCESS').catch(() => {});
         return {
             ...jsonRes,
             sources: aiRes.sources
         } as AnalysisResult;
     } catch (error: any) {
-        addSystemLog('AI_CORE', `Intel analysis failed: ${error.message}`, 'ERROR');
+        addSystemLog('AI_CORE', `Intel analysis failed: ${error.message}`, 'ERROR').catch(() => {});
         return {
             threatLevel: 0,
             summary: "Analysis failed. Connection interrupted or data corrupted.",
@@ -435,7 +435,7 @@ DIRECTIVES:
 };
 
 export const generatePersona = async (targetWeakness: string): Promise<PersonaProfile> => {
-    addSystemLog('AI_CORE', 'Synthesizing social engineering persona...', 'INFO');
+    addSystemLog('AI_CORE', 'Synthesizing social engineering persona...', 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `TASK: Construct a deep-cover persona to exploit a specific target vulnerability.
@@ -456,13 +456,13 @@ TARGET VULNERABILITY: "${targetWeakness}"`,
         });
         return JSON.parse(cleanJson(aiRes.text)) as PersonaProfile;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Persona generation failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Persona generation failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
 
 export const generateBehavioralForecast = async (targetData: string): Promise<BehavioralForecast> => {
-    addSystemLog('AI_CORE', 'Running predictive behavioral modeling...', 'INFO');
+    addSystemLog('AI_CORE', 'Running predictive behavioral modeling...', 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `TASK: Forecast target behavior based on historical data.
@@ -492,13 +492,13 @@ INPUT DATA: "${targetData}"`,
         });
         return JSON.parse(cleanJson(aiRes.text)) as BehavioralForecast;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Predictive modeling failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Predictive modeling failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
 
 export const generateTacticalAsset = async (): Promise<Asset> => {
-    addSystemLog('AI_CORE', 'Provisioning new tactical asset...', 'INFO');
+    addSystemLog('AI_CORE', 'Provisioning new tactical asset...', 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: "Generate a new autonomous tactical surveillance asset identity. Provide a unique ID, a specific Region (e.g. 'NA-EAST'), and determine its Type and current Status.",
@@ -516,10 +516,10 @@ export const generateTacticalAsset = async (): Promise<Asset> => {
                 required: ["id", "type", "region", "status", "dataRate"]
             }
         });
-        addSystemLog('AI_CORE', 'Asset provisioned and online.', 'SUCCESS');
+        addSystemLog('AI_CORE', 'Asset provisioned and online.', 'SUCCESS').catch(() => {});
         return JSON.parse(cleanJson(aiRes.text)) as Asset;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Asset provisioning failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Asset provisioning failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
@@ -536,7 +536,7 @@ export const generateTargetDossier = async (query: TargetSearchQuery | string, r
     const targetStr = typeof query === 'string' ? query : 
         `NAME: ${query.name}${query.email ? `, EMAIL: ${query.email}` : ''}${query.phone ? `, PHONE: ${query.phone}` : ''}${query.socials ? `, SOCIALS: ${query.socials}` : ''}${query.additionalInfo ? `, INFO: ${query.additionalInfo}` : ''}`;
     
-    addSystemLog('AI_CORE', `Initiating 5-Stage OSINT Pipeline for: ${targetStr}...`, 'INFO');
+    addSystemLog('AI_CORE', `Initiating 5-Stage OSINT Pipeline for: ${targetStr}...`, 'INFO').catch(() => {});
 
     // STAGE 1 & 2: Iterative Deep Research
     const deepResearch = await executeIterativeResearch(`Full OSINT profile for ${targetStr}`, 2);
@@ -617,7 +617,7 @@ export const generateTargetDossier = async (query: TargetSearchQuery | string, r
             }
         };
     } catch (error) {
-        addSystemLog('AI_CORE', 'Dossier synthesis failed, returning raw research.', 'ERROR');
+        addSystemLog('AI_CORE', 'Dossier synthesis failed, returning raw research.', 'ERROR').catch(() => {});
         return {
             report: deepResearch.report,
             socialProfiles: [],
@@ -632,7 +632,7 @@ export const generateTargetDossier = async (query: TargetSearchQuery | string, r
 };
 
 export const generateMissionPlan = async (targetName: string, details: string, objective: string): Promise<MissionPlan> => {
-    addSystemLog('AI_CORE', `Synthesizing Mission Profile for ${targetName}...`, 'INFO');
+    addSystemLog('AI_CORE', `Synthesizing Mission Profile for ${targetName}...`, 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `TASK: Develop a covert mission plan.
@@ -657,7 +657,7 @@ export const generateMissionPlan = async (targetName: string, details: string, o
         const result = JSON.parse(cleanJson(aiRes.text));
         return { targetName, objective, ...result } as MissionPlan;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Mission planning failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Mission planning failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
@@ -667,7 +667,7 @@ export const synthesizeSpeech = async (text: string): Promise<string> => {
     const apiKey = settings.apiKey || process.env.API_KEY || '';
     const genAI = new GoogleGenAI({ apiKey });
     
-    addSystemLog('AI_CORE', 'Synthesizing voice briefing...', 'INFO');
+    addSystemLog('AI_CORE', 'Synthesizing voice briefing...', 'INFO').catch(() => {});
     try {
         const response = await withRetry(() => genAI.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
@@ -686,13 +686,13 @@ export const synthesizeSpeech = async (text: string): Promise<string> => {
         if (!audioData) throw new Error("No audio data received");
         return audioData;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Voice synthesis failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Voice synthesis failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
 
 export const analyzeForensicArtifact = async (metadata: ForensicArtifact): Promise<string> => {
-    addSystemLog('AI_CORE', 'Analyzing forensic artifact...', 'INFO');
+    addSystemLog('AI_CORE', 'Analyzing forensic artifact...', 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `TASK: Analyze file metadata and EXIF tags.
@@ -701,13 +701,13 @@ INPUT: ${JSON.stringify(metadata)}`,
         });
         return aiRes.text;
     } catch (error) {
-        addSystemLog('AI_CORE', 'Forensic analysis failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Forensic analysis failed.', 'ERROR').catch(() => {});
         throw error;
     }
 };
 
 export const generateExfiltrationArtifacts = async (targetName: string, dossier: string): Promise<any[]> => {
-    addSystemLog('AI_CORE', `Generating exfiltration artifacts for ${targetName}...`, 'INFO');
+    addSystemLog('AI_CORE', `Generating exfiltration artifacts for ${targetName}...`, 'INFO').catch(() => {});
     try {
         const aiRes = await executeAI({
             prompt: `Generate 12 realistic files exfiltrated from "${targetName}" based on: ${dossier}.
@@ -718,7 +718,7 @@ Return JSON array: { "name": "string", "size": "string", "date": "string", "type
         const result = JSON.parse(cleanJson(aiRes.text));
         return Array.isArray(result) ? result : (result.files || result.artifacts || []);
     } catch (error) {
-        addSystemLog('AI_CORE', 'Artifact generation failed.', 'ERROR');
+        addSystemLog('AI_CORE', 'Artifact generation failed.', 'ERROR').catch(() => {});
         return [];
     }
 };

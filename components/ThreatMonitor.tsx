@@ -1,33 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNotification } from '../context/NotificationContext';
 import { audio } from '../services/audioService';
-import { addSystemLog } from '../services/storageService';
-
-const THREAT_MESSAGES = [
-  "HIGH-PRIORITY: Unauthorized access attempt detected on Node-X7.",
-  "CRITICAL: Unusual data exfiltration pattern identified in EU-CENTRAL.",
-  "ALERT: Subject-09 has changed geolocation to restricted zone.",
-  "WARNING: Encrypted packet burst detected from unknown origin.",
-  "INTEL: Significant shift in social sentiment for Target Alpha.",
-  "SYSTEM: AI Core identifying predictive anomaly in behavioral forecast."
-];
+import { eventService } from '../services/eventService';
 
 export const ThreatMonitor: React.FC = () => {
   const { notify } = useNotification();
   const [lastAlert, setLastAlert] = useState<string | null>(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      // 10% chance of a threat alert every 30 seconds
-      if (Math.random() < 0.1) {
-        const message = THREAT_MESSAGES[Math.floor(Math.random() * THREAT_MESSAGES.length)];
-        notify(message, 'warning');
-        addSystemLog('NETWORK', message, 'WARNING');
+    const handleLog = (log: any) => {
+      if (log.status === 'WARNING' || log.status === 'ERROR') {
+        notify(log.message, log.status === 'ERROR' ? 'error' : 'warning');
         setLastAlert(new Date().toLocaleTimeString());
       }
-    }, 30000);
-
-    return () => clearInterval(interval);
+    };
+    eventService.on('log', handleLog);
+    return () => eventService.off('log', handleLog);
   }, [notify]);
 
   return (

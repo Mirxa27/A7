@@ -67,7 +67,7 @@ export const DataIngestion: React.FC = () => {
     const executeOSINT = (url: string, type: string) => {
         if (!url) return;
         audio.playClick();
-        addSystemLog('USER_OPS', `Executing OSINT Vector [${type}] on target...`, 'INFO');
+        addSystemLog('USER_OPS', `Executing OSINT Vector [${type}] on target...`, 'INFO').catch(() => {});
         window.open(url, '_blank');
     };
 
@@ -76,17 +76,17 @@ export const DataIngestion: React.FC = () => {
         audio.playClick();
         setReconRunning(true);
         setReconResult(null);
-        addSystemLog('USER_OPS', `Initiating deep reconnaissance on ${reconTarget}...`, 'INFO');
+        addSystemLog('USER_OPS', `Initiating deep reconnaissance on ${reconTarget}...`, 'INFO').catch(() => {});
 
         try {
             const result = await generateTargetDossier(reconTarget, ['OSINT', 'WHOIS', 'DNS']);
             setReconResult(result);
             audio.playSuccess();
-            addSystemLog('USER_OPS', `Reconnaissance completed for ${reconTarget}.`, 'SUCCESS');
+            addSystemLog('USER_OPS', `Reconnaissance completed for ${reconTarget}.`, 'SUCCESS').catch(() => {});
         } catch (e) {
             console.error("Recon failed", e);
             audio.playError();
-            addSystemLog('USER_OPS', `Reconnaissance failed for ${reconTarget}.`, 'ERROR');
+            addSystemLog('USER_OPS', `Reconnaissance failed for ${reconTarget}.`, 'ERROR').catch(() => {});
         } finally {
             setReconRunning(false);
         }
@@ -145,7 +145,7 @@ export const DataIngestion: React.FC = () => {
             })));
             
             audio.playSuccess();
-            addSystemLog('USER_OPS', `Sherlock Scan completed for ${usernameQuery}. ${foundProfiles.length} profiles found.`, 'SUCCESS');
+            addSystemLog('USER_OPS', `Sherlock Scan completed for ${usernameQuery}. ${foundProfiles.length} profiles found.`, 'SUCCESS').catch(() => {});
 
         } catch (e) {
             clearInterval(logInterval);
@@ -167,7 +167,7 @@ export const DataIngestion: React.FC = () => {
         setIsAnalyzing(true);
         setFileData(null);
         setAnalysisReport('');
-        addSystemLog('FORENSICS', `Ingesting file artifact: ${file.name}`, 'INFO');
+        addSystemLog('FORENSICS', `Ingesting file artifact: ${file.name}`, 'INFO').catch(() => {});
 
         try {
             // Real Metadata Extraction using exifr
@@ -185,7 +185,7 @@ export const DataIngestion: React.FC = () => {
             };
 
             setFileData(artifact);
-            addSystemLog('FORENSICS', `Metadata extraction complete. ${Object.keys(artifact.exif).length} tags found.`, 'SUCCESS');
+            addSystemLog('FORENSICS', `Metadata extraction complete. ${Object.keys(artifact.exif).length} tags found.`, 'SUCCESS').catch(() => {});
 
             // AI Analysis
             const report = await analyzeForensicArtifact(artifact);
@@ -194,7 +194,7 @@ export const DataIngestion: React.FC = () => {
 
         } catch (error) {
             console.error("Forensics Error", error);
-            addSystemLog('FORENSICS', 'Extraction failed. Corrupt or unsupported file.', 'ERROR');
+            addSystemLog('FORENSICS', 'Extraction failed. Corrupt or unsupported file.', 'ERROR').catch(() => {});
             audio.playError();
         } finally {
             setIsAnalyzing(false);
@@ -206,7 +206,7 @@ export const DataIngestion: React.FC = () => {
     const handleReverseSearch = (service: 'GOOGLE' | 'TINEYE') => {
         if (!selectedFile) return;
         audio.playClick();
-        addSystemLog('USER_OPS', `Initiating Reverse Image Search via ${service}...`, 'INFO');
+        addSystemLog('USER_OPS', `Initiating Reverse Image Search via ${service}...`, 'INFO').catch(() => {});
 
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(selectedFile);
