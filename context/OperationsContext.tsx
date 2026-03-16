@@ -60,7 +60,7 @@ export const OperationsProvider: React.FC<OperationsProviderProps> = ({ children
   const [aiStatus, setAiStatus] = useState<'IDLE' | 'READY' | 'OFFLINE'>('IDLE');
 
   const checkAIStatus = async () => {
-    const settings = getSettings();
+    const settings = await getSettings();
     if (!settings.apiKey) {
       setAiStatus('OFFLINE');
       return;
@@ -156,7 +156,7 @@ export const OperationsProvider: React.FC<OperationsProviderProps> = ({ children
       }
       
       addLocalLog(`>> CONNECTING TO GLOBAL INFORMATION GRID...`);
-      addSystemLog('USER_OPS', `Surveillance operation initiated on ${targetInput} with [${activeResources.length}] active vectors`, 'INFO');
+      addSystemLog('USER_OPS', `Surveillance operation initiated on ${targetInput} with [${activeResources.length}] active vectors`, 'INFO').catch(() => {});
       
       // Combine inputs for the AI query with specific instructions based on type
       let specificInstructions = "";
@@ -231,7 +231,7 @@ export const OperationsProvider: React.FC<OperationsProviderProps> = ({ children
       console.error(error);
       addLocalLog(`!! CRITICAL FAILURE: OPERATION ABORTED !!`);
       addLocalLog(`!! CHECK SYSTEM LOGS FOR TRACE !!`);
-      addSystemLog('USER_OPS', `Operation failed for target ${targetInput}`, 'ERROR');
+      addSystemLog('USER_OPS', `Operation failed for target ${targetInput}`, 'ERROR').catch(() => {});
       setStatus('FAILED');
     }
   };

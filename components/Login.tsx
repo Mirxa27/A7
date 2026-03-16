@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Lock, Fingerprint, ChevronRight, Activity } from 'lucide-react';
 import { audio } from '../services/audioService';
+import { authService } from '../services/authService';
 
 interface LoginProps {
   onLogin: () => void;
@@ -35,24 +36,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     });
   }, []);
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     audio.playClick();
     setStep('VERIFYING');
     
-    // Simulate verification
-    setTimeout(() => {
-      // For demo, any password works, but we add a "fake" error for realism if empty
-      if (password.length > 0) {
-        audio.playSuccess();
-        onLogin();
-      } else {
-        audio.playError();
-        setError(true);
-        setStep('AUTH');
-        setTimeout(() => setError(false), 2000);
-      }
-    }, 1500);
+    try {
+      await authService.login(password);
+      audio.playSuccess();
+      onLogin();
+    } catch (error) {
+      audio.playError();
+      setError(true);
+      setStep('AUTH');
+      setTimeout(() => setError(false), 2000);
+    }
   };
 
   return (
@@ -130,7 +128,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             {error && (
               <div className="mt-4 text-center text-xs text-red-500 font-bold animate-pulse">
-                ACCESS DENIED. INVALID CREDENTIALS.
+                AUTHENTICATION FAILED. INVALID ACCESS CODE.
               </div>
             )}
             

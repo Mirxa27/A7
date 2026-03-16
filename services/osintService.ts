@@ -15,21 +15,21 @@ export async function performOsintLookup(target: string): Promise<OsintData> {
 
     try {
         if (isPhone) {
-            const res = await fetch(`/api/osint/phone/${encodeURIComponent(target)}`);
+            const res = await fetch(`/api/osint/phone/${encodeURIComponent(target)}`, { headers: authService.getAuthHeaders() as any });
             data.phone = await res.json();
         } else if (isUrl || isDomain) {
             const domain = isUrl ? new URL(target.startsWith('http') ? target : `https://${target}`).hostname : target;
             
             const [dnsRes, whoisRes] = await Promise.all([
-                fetch(`/api/osint/dns/${encodeURIComponent(domain)}`),
-                fetch(`/api/osint/whois/${encodeURIComponent(domain)}`)
+                fetch(`/api/osint/dns/${encodeURIComponent(domain, { headers: authService.getAuthHeaders() as any })}`, { headers: authService.getAuthHeaders() as any }),
+                fetch(`/api/osint/whois/${encodeURIComponent(domain, { headers: authService.getAuthHeaders() as any })}`, { headers: authService.getAuthHeaders() as any })
             ]);
             
             data.dns = await dnsRes.json();
             data.whois = await whoisRes.json();
         } else {
             // Assume username
-            const res = await fetch(`/api/osint/username/${encodeURIComponent(target)}`);
+            const res = await fetch(`/api/osint/username/${encodeURIComponent(target)}`, { headers: authService.getAuthHeaders() as any });
             const results = await res.json();
             data.username = results.filter((r: any) => r.available === false);
         }

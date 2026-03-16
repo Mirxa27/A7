@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ViewState } from '../types';
 import { ShieldAlert, Activity, FileText, Network, Terminal, LogOut, Radio, UserCheck, TrendingUp, Database, Crosshair, Menu, X, Volume2, VolumeX, HardDrive, Settings as SettingsIcon } from 'lucide-react';
@@ -6,6 +6,7 @@ import { useOperations } from '../context/OperationsContext';
 import { useNotification } from '../context/NotificationContext';
 import { addSystemLog } from '../services/storageService';
 import { audio } from '../services/audioService';
+import { authService } from '../services/authService';
 
 interface LayoutProps {
   currentView: ViewState;
@@ -18,12 +19,26 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
   const { notify } = useNotification();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [metrics, setMetrics] = useState<any>({ cpu: 0, memory: { percentage: 0 } });
 
-  const handleDisconnect = () => {
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const res = await fetch('/api/metrics', { headers: authService.getAuthHeaders() as any });
+        if (res.ok) setMetrics(await res.json());
+      } catch (e) { /* ignore */ }
+    };
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleDisconnect = async () => {
       audio.playClick();
       resetOperation();
-      addSystemLog('USER_OPS', 'Manual Secure Disconnect initiated.', 'WARNING');
+      addSystemLog('USER_OPS', 'Manual Secure Disconnect initiated.', 'WARNING').catch(() => {});
       notify('SECURE DISCONNECT INITIATED', 'error');
+      await authService.logout();
       setTimeout(() => window.location.reload(), 1000); 
   };
 
@@ -123,23 +138,23 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, setView, children }
           >
              <div className="flex justify-between">
                 <span>CPU</span>
-                <span className="text-emerald-500">12%</span>
+                <span className="text-emerald-500">{metrics.cpu}%</span>
              </div>
              <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: '12%' }}
+                  animate={{ width: `${metrics.cpu}%` }}
                   className="bg-emerald-500 h-full"
                 ></motion.div>
              </div>
              <div className="flex justify-between mt-2">
                 <span>MEM</span>
-                <span className="text-emerald-500">43%</span>
+                <span className="text-emerald-500">{metrics.memory.percentage}%</span>
              </div>
               <div className="w-full bg-slate-800 h-1 mt-1 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: '43%' }}
+                  animate={{ width: `${metrics.memory.percentage}%` }}
                   className="bg-emerald-500 h-full"
                 ></motion.div>
              </div>

@@ -38,12 +38,12 @@ export const IntelSearch: React.FC = () => {
   useEffect(() => {
     // Load initial data from persistent storage
     getIntelRecords().then(setRecords);
-    setTargets(getTargets());
+    getTargets().then(setTargets).catch(() => {});
     
     // Listen for updates
     const handleUpdate = () => {
         getIntelRecords().then(setRecords);
-        setTargets(getTargets());
+        getTargets().then(setTargets).catch(() => {});
     };
     window.addEventListener('storage_agent7_intel_db', handleUpdate);
     window.addEventListener('storage_agent7_targets', handleUpdate);
@@ -99,7 +99,7 @@ export const IntelSearch: React.FC = () => {
     // Execute instant save
     try {
         const updatedList = await saveIntelRecord(newRecord);
-        addSystemLog('USER_OPS', `New intel ingested: ${newRecord.id} - ${uploadTitle}`, 'SUCCESS');
+        addSystemLog('USER_OPS', `New intel ingested: ${newRecord.id} - ${uploadTitle}`, 'SUCCESS').catch(() => {});
         
         setRecords(updatedList);
         setUploadSuccess(true);
@@ -112,7 +112,7 @@ export const IntelSearch: React.FC = () => {
             setActiveTab('SEARCH');
         }, 1500);
     } catch (e) {
-        addSystemLog('USER_OPS', 'Intel ingestion failed.', 'ERROR');
+        addSystemLog('USER_OPS', 'Intel ingestion failed.', 'ERROR').catch(() => {});
         console.error("Upload failed", e);
     } finally {
         setIsUploading(false);
@@ -184,12 +184,12 @@ export const IntelSearch: React.FC = () => {
             accounts: dossier.socialProfiles || []
         }
       };
-      saveTarget(newTarget);
+      saveTarget(newTarget).catch(() => {});
 
-      addSystemLog('USER_OPS', `Live scan completed and saved for: ${scanTarget}`, 'SUCCESS');
+      addSystemLog('USER_OPS', `Live scan completed and saved for: ${scanTarget}`, 'SUCCESS').catch(() => {});
     } catch (e) {
       console.error("Live scan failed", e);
-      addSystemLog('USER_OPS', 'Live scan failed.', 'ERROR');
+      addSystemLog('USER_OPS', 'Live scan failed.', 'ERROR').catch(() => {});
     } finally {
       setIsScanning(false);
     }

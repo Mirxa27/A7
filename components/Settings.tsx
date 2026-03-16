@@ -12,7 +12,12 @@ interface ModelOption {
 }
 
 export const Settings: React.FC = () => {
-  const [settings, setSettings] = useState<AISettings>(getSettings());
+  const [settings, setSettings] = useState<AISettings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSettings().then(s => { setSettings(s); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<'IDLE' | 'SUCCESS' | 'FAILED'>('IDLE');
@@ -103,13 +108,13 @@ export const Settings: React.FC = () => {
     setIsSaving(true);
     const success = await testAIConnection(settings);
     if (success) {
-      saveSettings(settings);
+      await saveSettings(settings);
       setTestStatus('SUCCESS');
-      addSystemLog('SYSTEM', 'AI Configuration verified and synchronized.', 'SUCCESS');
+      addSystemLog('SYSTEM', 'AI Configuration verified and synchronized.', 'SUCCESS').catch(() => {});
       notify('AI Configuration updated successfully', 'success');
     } else {
       setTestStatus('FAILED');
-      addSystemLog('SYSTEM', 'AI Configuration failed verification. Save aborted.', 'ERROR');
+      addSystemLog('SYSTEM', 'AI Configuration failed verification. Save aborted.', 'ERROR').catch(() => {});
       notify('AI Configuration failed. Check your credentials.', 'error');
     }
     setIsSaving(false);
