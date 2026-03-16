@@ -24,3 +24,65 @@ model IntelRecord {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Asset {
+  id        String   @id @default(uuid())
+  type      String   // IOT_SWARM, PACKET_SNIFFER, GHOST_RELAY, TROJAN_DAEMON
+  region    String
+  status    String   @default("ACTIVE") // ACTIVE, DORMANT, COMPROMISED, EXFILTRATING
+  dataRate  Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Target {
+  id            String   @id @default(uuid())
+  name          String
+  status        String   @default("TRACKING") // TRACKING, LOST, COMPROMISED, IDLE
+  lastSeen      String
+  location      String?
+  activityLevel Int      @default(0)
+  metadata      Json?    // stores images, socialFootprint, etc.
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  source    String   // SYSTEM, NETWORK, AI_CORE, USER_OPS, FORENSICS
+  message   String
+  status    String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source])
+}
+
+model AppSettings {
+  id              String   @id @default("default")
+  provider        String   @default("GEMINI")
+  model           String   @default("gemini-2.0-flash")
+  hfModel         String?
+  apiKey          String   @default("")
+  systemPrompt    String   @default("")
+  hfEndpoint      String?
+  baseUrl         String?
+  usePremiumTools Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  type        String
+  data        Json
+  status      String    @default("pending") // pending, running, completed, failed
+  progress    Int       @default(0)
+  result      Json?
+  error       String?
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
