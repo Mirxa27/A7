@@ -132,10 +132,11 @@ async function startServer() {
             signal: controller.signal as any
           });
           clearTimeout(timeoutId);
-          return { name: site.name, url: site.url, exists: response.status === 200 };
+          const found = response.status === 200;
+          return { platform: site.name, url: site.url, available: !found };
         } catch (e) {
           clearTimeout(timeoutId);
-          return { name: site.name, url: site.url, exists: false, error: true };
+          return { platform: site.name, url: site.url, available: true };
         }
       }));
 

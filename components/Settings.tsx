@@ -16,9 +16,9 @@ export const Settings: React.FC = () => {
 
   const PRESETS = {
     GEMINI: [
-      { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', desc: 'Maximum reasoning & intelligence' },
-      { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', desc: 'High-speed tactical response' },
-      { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 Image', desc: 'Visual intelligence & generation' }
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Maximum reasoning & intelligence' },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'High-speed tactical response' },
+      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash', desc: 'Experimental vision & intelligence' }
     ],
     HUGGINGFACE: [
       { id: 'meta-llama/Llama-3.1-70B-Instruct', name: 'Llama 3.1 70B', desc: 'State-of-the-art open reasoning' },
@@ -209,7 +209,7 @@ export const Settings: React.FC = () => {
                     ...settings, 
                     [settings.provider === 'GEMINI' || settings.provider === 'OPENAI' ? 'model' : 'hfModel']: e.target.value 
                   })}
-                  placeholder={settings.provider === 'GEMINI' ? 'gemini-3.1-pro-preview' : settings.provider === 'OPENAI' ? 'gpt-4o' : 'meta-llama/Llama-3-70b-instruct'}
+                  placeholder={settings.provider === 'GEMINI' ? 'gemini-2.5-pro' : settings.provider === 'OPENAI' ? 'gpt-4o' : 'meta-llama/Llama-3-70b-instruct'}
                   className={`w-full bg-black/50 border rounded-lg px-4 py-3 font-mono text-sm outline-none transition-all duration-300 ${
                     testStatus === 'FAILED' 
                       ? 'border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' 

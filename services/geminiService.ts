@@ -366,7 +366,7 @@ export const testAIConnection = async (testSettings: AISettings): Promise<boolea
         } else {
             const apiKey = testSettings.apiKey || process.env.API_KEY || '';
             const genAI = new GoogleGenAI({ apiKey });
-            const modelName = testSettings.model || "gemini-3.1-pro-preview";
+            const modelName = testSettings.model || "gemini-2.5-pro";
             await genAI.models.generateContent({
                 model: modelName,
                 contents: "ping",

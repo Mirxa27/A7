@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useEffect } from 'react';
 import { generateMissionPlan, generateTargetDossier, generateExfiltrationArtifacts, testAIConnection } from '../services/geminiService';
 import { performOsintLookup } from '../services/osintService';
-import { saveMission, addSystemLog, getSettings } from '../services/storageService';
-import { MissionPlan, TargetDossier } from '../types';
+import { saveMission, addSystemLog, getSettings, saveTarget } from '../services/storageService';
+import { MissionPlan, TargetDossier, Target } from '../types';
 
 interface OperationsContextType {
   targetInput: string;
@@ -179,6 +179,27 @@ export const OperationsProvider: React.FC<OperationsProviderProps> = ({ children
       if (intelResult.deviceIntel) {
           addLocalLog(`>> DEVICE TELEMETRY: ONLINE [${intelResult.deviceIntel.batteryLevel}]`);
       }
+
+      // Persist target to surveillance grid and social engineering module
+      const newTarget: Target = {
+          id: `TGT-${Math.floor(Math.random() * 9000) + 1000}`,
+          name: intelResult.exactName || targetInput,
+          status: 'TRACKING',
+          lastSeen: new Date().toISOString(),
+          activityLevel: Math.floor(Math.random() * 40) + 60,
+          images: intelResult.images || [],
+          socialFootprint: {
+              visibility: intelResult.socialProfiles.length > 0
+                  ? Math.min(95, intelResult.socialProfiles.length * 15 + 20)
+                  : 15,
+              accessLevel: activeResources.length > 0
+                  ? 'FULL'
+                  : intelResult.socialProfiles.length > 2 ? 'PARTIAL' : 'NONE',
+              accounts: intelResult.socialProfiles || []
+          }
+      };
+      saveTarget(newTarget);
+      addLocalLog(`>> TARGET PROFILE SAVED TO SURVEILLANCE GRID.`);
       
       // Step 2: Analysis & Planning
       await sleep(500);
