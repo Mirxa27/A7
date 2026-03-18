@@ -1,14 +1,37 @@
-import { IntelRecord, Asset, MissionPlan, SystemLog, AISettings, Target } from '../types.js';
-import { authService } from './authService.js';
+import { IntelRecord, Asset, MissionPlan, SystemLog, AISettings, Target } from '../types';
 
-const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-  const headers = { ...authService.getAuthHeaders(), ...options.headers };
-  const res = await fetch(url, { ...options, headers });
-  if (res.status === 401) {
-    // Session expired
-    await authService.logout();
-    window.location.reload();
-    throw new Error('Session expired');
+const INTEL_KEY = 'agent7_intel_db';
+const ASSETS_KEY = 'agent7_assets';
+const LOGS_KEY = 'agent7_system_logs';
+const SETTINGS_KEY = 'agent7_ai_settings';
+const TARGETS_KEY = 'agent7_targets';
+
+const DEFAULT_SETTINGS: AISettings = {
+    provider: 'GEMINI',
+    model: '',
+    hfModel: '',
+    apiKey: '',
+    systemPrompt: 'You are AGENT-7, a high-level cyber intelligence AI. Your purpose is to assist in deep-cover operations, target reconnaissance, and tactical planning. You provide precise, factual data and never compromise operational security.',
+    usePremiumTools: true,
+    baseUrl: 'https://api.openai.com/v1'
+};
+
+const DEFAULT_INTEL: IntelRecord[] = [
+  { 
+    id: 'REC-001', 
+    title: 'Operation Blackbriar Summary', 
+    type: 'REPORT', 
+    date: '2023-10-12', 
+    clearance: 'TOP SECRET',
+    details: 'Surveillance indicates Subject 09 has moved assets to offshore accounts in Cayman Islands. Intercepted comms suggest a rendezvous in Berlin on 11/04. Recommended action: Deploy active tracking team.'
+  },
+  { 
+    id: 'REC-002', 
+    title: 'Target Alpha WhatsApp Intercept', 
+    type: 'INTERCEPT', 
+    date: '2023-11-05', 
+    clearance: 'SECRET',
+    details: '[14:02] T-Alpha: "The package is secure."\n[14:03] Handler: "Proceed to extraction point."\n[14:05] T-Alpha: "Negative, surveillance detected. Aborting."\nAnalysis: Target is aware of surveillance. Counter-measures active.'
   }
   if (!res.ok) throw new Error(`API Error: ${res.status}`);
   return res;
